@@ -337,6 +337,12 @@ void bridge_TexGeni(GLenum coord, GLenum pname, GLint param);
 void bridge_Enable(GLenum cap);
 void bridge_Disable(GLenum cap);
 
+// glIsEnabled (bridge-tracked legacy caps like GL_FOG, GL_NORMALIZE, GL_TEXTURE_2D)
+GLboolean bridge_IsEnabled(GLenum cap);
+
+// glHint — filter non-GLES3 hints (GL_FOG_HINT etc.) to prevent GL_INVALID_ENUM
+void bridge_Hint(GLenum target, GLenum mode);
+
 // Client state (vertex arrays)
 void bridge_EnableClientState(GLenum array);
 void bridge_DisableClientState(GLenum array);
@@ -362,6 +368,8 @@ void bridge_TexImage2D(GLenum target, GLint level, GLint internalformat,
 void bridge_TexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
                           GLsizei width, GLsizei height, GLenum format, GLenum type,
                           const void *pixels);
+// glTexParameterfv wrapper — silently drops anisotropy calls when extension unavailable
+void bridge_TexParameterfv(GLenum target, GLenum pname, const GLfloat *params);
 
 // Flush the current bridge shader state to GL
 void bridge_FlushState(void);
@@ -450,9 +458,16 @@ void bridge_FlushState(void);
 // Texture operations
 #define glTexImage2D        bridge_TexImage2D
 #define glTexSubImage2D     bridge_TexSubImage2D
+#define glTexParameterfv    bridge_TexParameterfv
 
 // State queries (for bridge-tracked values like PROJECTION_MATRIX, CURRENT_COLOR)
 #define glGetFloatv         bridge_GetFloatv
+
+// glIsEnabled — bridge-tracked for legacy caps (GL_FOG, GL_NORMALIZE, GL_TEXTURE_2D)
+#define glIsEnabled         bridge_IsEnabled
+
+// glHint — filter non-GLES3 targets (GL_FOG_HINT etc.) to avoid GL_INVALID_ENUM
+#define glHint              bridge_Hint
 
 #endif // !GLES_BRIDGE_IMPLEMENTATION
 

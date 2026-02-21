@@ -62,6 +62,9 @@ static MatrixStack gProjStack;
 static MatrixStack gTexStack;
 static GLenum gCurrentMatrixMode = GL_MODELVIEW;
 
+// Whether GL_EXT_texture_filter_anisotropic is available (detected in GLESBridge_Init)
+static int gHasAnisotropyExt = 0;
+
 static MatrixStack* CurrentStack(void) {
     switch (gCurrentMatrixMode) {
         case GL_PROJECTION: return &gProjStack;
@@ -525,7 +528,14 @@ void GLESBridge_Init(void) {
 
     gState.dirty = 1;
 
-    BRIDGE_LOGI("GLESBridge initialized");
+    // Detect GL_EXT_texture_filter_anisotropic support
+    {
+        GLfloat dummy;
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &dummy);
+        gHasAnisotropyExt = (glGetError() == GL_NO_ERROR);
+    }
+
+    BRIDGE_LOGI("GLESBridge initialized (anisotropy=%d)", gHasAnisotropyExt);
 }
 
 void GLESBridge_Shutdown(void) {
@@ -982,6 +992,9 @@ void bridge_Enable(GLenum cap) {
         case GL_VERTEX_ARRAY: case GL_NORMAL_ARRAY:
         case GL_COLOR_ARRAY:  case GL_TEXTURE_COORD_ARRAY:
             return;
+        // Desktop-GL-only caps that aren't in GLES3 — silently ignore
+        case GL_RESCALE_NORMAL:     // 0x803A
+            return;
         default:
             glEnable(cap); return;
     }
@@ -1007,6 +1020,9 @@ void bridge_Disable(GLenum cap) {
             gState.texture2DEnabled = 0; gState.dirty = 1; return;
         case GL_VERTEX_ARRAY: case GL_NORMAL_ARRAY:
         case GL_COLOR_ARRAY:  case GL_TEXTURE_COORD_ARRAY:
+            return;
+        // Desktop-GL-only caps that aren't in GLES3 — silently ignore
+        case GL_RESCALE_NORMAL:     // 0x803A
             return;
         default:
             glDisable(cap); return;
@@ -1201,6 +1217,12 @@ void bridge_GetFloatv(GLenum pname, GLfloat *params) {
         case GL_CURRENT_COLOR:     // 0x0B00 — return from bridge state
             memcpy(params, gState.currentColor, 4 * sizeof(GLfloat));
             break;
+        case GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT: // 0x84FF
+            if (gHasAnisotropyExt)
+                glGetFloatv(pname, params);
+            else
+                params[0] = 1.0f;
+            break;
         default:
             glGetFloatv(pname, params);
             break;
@@ -1236,6 +1258,24 @@ void bridge_TexImage2D(GLenum target, GLint level, GLint internalformat,
             dst[i*4+1] = src[i*4+1]; // G
             dst[i*4+2] = src[i*4+0]; // B ← R
             dst[i*4+3] = src[i*4+3]; // A
+        }
+        glTexImage2D(target, level, GL_RGBA, width, height, border, GL_RGBA, GL_UNSIGNED_BYTE, dst);
+        free(dst);
+        return;
+    }
+
+    // Convert classic Mac 1_5_5_5_REV (A1, R5, G5, B5 packed) to GL_RGBA8
+    // Used by terrain textures (GL_BGRA_EXT, GL_UNSIGNED_SHORT_1_5_5_5_REV)
+    if (pixels && type == GL_UNSIGNED_SHORT_1_5_5_5_REV) {
+        const uint16_t *src = (const uint16_t*)pixels;
+        uint8_t *dst = (uint8_t*)malloc((size_t)(width * height * 4));
+        if (!dst) return;
+        for (int i = 0; i < width * height; i++) {
+            uint16_t pix = src[i];
+            dst[i*4+0] = (uint8_t)(((pix >> 10) & 0x1f) * 255 / 31); // R
+            dst[i*4+1] = (uint8_t)(((pix >>  5) & 0x1f) * 255 / 31); // G
+            dst[i*4+2] = (uint8_t)(( pix        & 0x1f) * 255 / 31); // B
+            dst[i*4+3] = (uint8_t)((pix & 0x8000) ? 255 : 0);        // A
         }
         glTexImage2D(target, level, GL_RGBA, width, height, border, GL_RGBA, GL_UNSIGNED_BYTE, dst);
         free(dst);
@@ -1291,6 +1331,56 @@ void bridge_TexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffs
     }
 
     glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);
+}
+
+// ============================================================================
+// glHint — filter non-GLES3 hint targets to avoid GL_INVALID_ENUM
+// GLES3 only supports GL_FRAGMENT_SHADER_DERIVATIVE_HINT and GL_GENERATE_MIPMAP_HINT.
+// ============================================================================
+
+void bridge_Hint(GLenum target, GLenum mode) {
+    switch (target) {
+        case 0x8B8B: // GL_FRAGMENT_SHADER_DERIVATIVE_HINT
+        case 0x8192: // GL_GENERATE_MIPMAP_HINT
+            glHint(target, mode);
+            break;
+        default:
+            // Silently ignore desktop-GL-only hints (e.g. GL_FOG_HINT, GL_PERSPECTIVE_CORRECTION_HINT)
+            break;
+    }
+}
+
+// ============================================================================
+// glIsEnabled — return bridge-tracked state for caps unsupported by GLES3
+// ============================================================================
+
+GLboolean bridge_IsEnabled(GLenum cap) {
+    switch (cap) {
+        case GL_LIGHTING:       return (GLboolean)gState.lightingEnabled;
+        case GL_FOG:            return (GLboolean)gState.fogEnabled;
+        case GL_ALPHA_TEST:     return (GLboolean)gState.alphaTestEnabled;
+        case GL_NORMALIZE:      return (GLboolean)gState.normalizeEnabled;
+        case GL_COLOR_MATERIAL: return (GLboolean)gState.colorMaterialEnabled;
+        case GL_TEXTURE_2D:     return (GLboolean)gState.texture2DEnabled;
+        case GL_TEXTURE_GEN_S:
+        case GL_TEXTURE_GEN_T:  return (GLboolean)gState.texGenEnabled;
+        default:
+            return glIsEnabled(cap);
+    }
+}
+
+// ============================================================================
+// glTexParameterfv — guard anisotropy calls when extension is unavailable
+// ============================================================================
+
+void bridge_TexParameterfv(GLenum target, GLenum pname, const GLfloat *params) {
+    if (pname == GL_TEXTURE_MAX_ANISOTROPY_EXT) {
+        if (gHasAnisotropyExt)
+            glTexParameterfv(target, pname, params);
+        // else: silently ignore — anisotropy extension not available
+        return;
+    }
+    glTexParameterfv(target, pname, params);
 }
 
 #endif // __ANDROID__
