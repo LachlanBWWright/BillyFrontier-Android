@@ -102,6 +102,10 @@ void OGL_Boot(void)
 short	i;
 float	f;
 
+#ifdef __ANDROID__
+	GLESBridge_Init();
+#endif
+
 		/* GENERATE ANAGLYPH GREY CONVERSION TABLE */
 
 	f = 0;
@@ -123,6 +127,9 @@ float	f;
 void OGL_Shutdown(void)
 {
 	OGL_DisposeDrawContext();
+#ifdef __ANDROID__
+	GLESBridge_Shutdown();
+#endif
 }
 
 
