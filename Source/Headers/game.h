@@ -6,7 +6,11 @@
 
 #include <math.h>
 #include <SDL3/SDL.h>
+#ifdef __ANDROID__
+#include "../3D/gles_compat.h"
+#else
 #include <SDL3/SDL_opengl.h>
+#endif
 
 #include "Pomme.h"
 
