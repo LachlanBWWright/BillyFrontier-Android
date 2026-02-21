@@ -242,14 +242,14 @@ static const char* kVertexShaderSrc =
     "    v_texcoord = (u_texMatrix * vec4(a_texcoord, 0.0, 1.0)).xy;\n"
     "    // Unit 1 sphere map coords (computed always; frag shader uses only when multiTextureEnabled)\n"
     "    {\n"
-    "        const float kEps = 1e-4;\n"
+    "        const float kSphereMapEpsilon = 1e-4;\n"
     "        vec3 sp = (u_mv * vec4(a_position, 1.0)).xyz;\n"
     "        vec3 sn = a_normal;\n"
     "        if (u_normalizeEnabled) sn = normalize(sn);\n"
     "        vec3 sen = normalize(mat3(u_mv) * sn);\n"
     "        vec3 sr = reflect(normalize(sp), sen);\n"
     "        float sm = 2.0 * sqrt(sr.x*sr.x + sr.y*sr.y + (sr.z+1.0)*(sr.z+1.0));\n"
-    "        v_texcoord_sphere = sm > kEps ? vec2(sr.x/sm + 0.5, sr.y/sm + 0.5) : vec2(0.5, 0.5);\n"
+    "        v_texcoord_sphere = sm > kSphereMapEpsilon ? vec2(sr.x/sm + 0.5, sr.y/sm + 0.5) : vec2(0.5, 0.5);\n"
     "    }\n"
     "\n"
     "    if (u_lightingEnabled) {\n"
@@ -975,6 +975,7 @@ void bridge_AlphaFunc(GLenum func, GLfloat ref) {
 // ============================================================================
 
 void bridge_ActiveTexture(GLenum unit) {
+    // Track unit 0 and 1; other units (unsupported by our bridge) fall back to 0
     gActiveTexUnit = (unit == GL_TEXTURE1) ? 1 : 0;
     glActiveTexture(unit);
 }
@@ -986,12 +987,15 @@ void bridge_ActiveTexture(GLenum unit) {
 void bridge_TexEnvi(GLenum target, GLenum pname, GLint param) {
     (void)target;
     if (gActiveTexUnit == 1) {
-        // Unit 1 (sphere map): track the combine RGB mode
         if (pname == GL_COMBINE_RGB) {
-            gState.texEnvMode1 = (int)param;   // GL_ADD or GL_MODULATE
+            // GL_COMBINE_RGB = GL_ADD or GL_MODULATE: store as unit-1 combine mode
+            gState.texEnvMode1 = (int)param;
+            gState.dirty = 1;
+        } else if (pname == GL_TEXTURE_ENV_MODE && param == GL_MODULATE) {
+            // Plain MODULATE on unit 1 (not COMBINE): reset to MODULATE
+            gState.texEnvMode1 = GL_MODULATE;
             gState.dirty = 1;
         }
-        // GL_TEXTURE_ENV_MODE GL_COMBINE etc. on unit 1 — no additional action needed
         return;
     }
     // Unit 0

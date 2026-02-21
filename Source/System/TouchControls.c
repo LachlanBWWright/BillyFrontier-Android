@@ -31,7 +31,7 @@
 #define BTN_JUMP_X  0.90f
 #define BTN_JUMP_Y  0.60f
 
-// D-pad (left side, used in duel mode and menu mode)
+// D-pad (left side, used in duel mode)
 #define DPAD_CX     0.16f
 #define DPAD_CY     0.75f
 #define DPAD_BTN_R  0.040f
