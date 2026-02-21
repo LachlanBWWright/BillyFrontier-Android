@@ -433,16 +433,12 @@ void DoSDLMaintenance(void)
 		// Forward every event to touch controls before other processing
 		TouchControls_ProcessEvent(&event);
 
-		// Skip SDL mouse events synthesized from touch to avoid double-processing
+		// Skip SDL mouse button events synthesized from touch (prevents accidental firing).
+		// Allow mouse MOTION events from touch so the crosshair can be moved by finger drag.
 		if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
 			event.type == SDL_EVENT_MOUSE_BUTTON_UP)
 		{
 			if (event.button.which == SDL_TOUCH_MOUSEID)
-				continue;
-		}
-		if (event.type == SDL_EVENT_MOUSE_MOTION)
-		{
-			if (event.motion.which == SDL_TOUCH_MOUSEID)
 				continue;
 		}
 #endif

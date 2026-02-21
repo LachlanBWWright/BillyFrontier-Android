@@ -159,18 +159,26 @@ static void RebuildLayout(void) {
             break;
 
         case TOUCH_SCHEME_DUEL:
-            // Large left/right arrow buttons (one each side)
+            // Full D-pad for the key sequence (up/down/left/right arrows)
             gButtons[gButtonCount++] = (TouchButton){
-                .cx = ScaleX(DUEL_LEFT_X), .cy = ScaleY(DUEL_LEFT_Y),
-                .radius = ScaleX(DUEL_BTN_R), .btnId = TOUCH_BTN_DPAD_LEFT, .visible = true
+                .cx = ScaleX(DPAD_CX), .cy = ScaleY(DPAD_CY - DPAD_OFFSET),
+                .radius = ScaleX(DPAD_BTN_R), .btnId = TOUCH_BTN_DPAD_UP, .visible = true
             };
             gButtons[gButtonCount++] = (TouchButton){
-                .cx = ScaleX(DUEL_RIGHT_X), .cy = ScaleY(DUEL_RIGHT_Y),
-                .radius = ScaleX(DUEL_BTN_R), .btnId = TOUCH_BTN_DPAD_RIGHT, .visible = true
+                .cx = ScaleX(DPAD_CX), .cy = ScaleY(DPAD_CY + DPAD_OFFSET),
+                .radius = ScaleX(DPAD_BTN_R), .btnId = TOUCH_BTN_DPAD_DOWN, .visible = true
             };
-            // Shoot button center-right
             gButtons[gButtonCount++] = (TouchButton){
-                .cx = ScaleX(0.70f), .cy = ScaleY(0.65f),
+                .cx = ScaleX(DPAD_CX - DPAD_OFFSET), .cy = ScaleY(DPAD_CY),
+                .radius = ScaleX(DPAD_BTN_R), .btnId = TOUCH_BTN_DPAD_LEFT, .visible = true
+            };
+            gButtons[gButtonCount++] = (TouchButton){
+                .cx = ScaleX(DPAD_CX + DPAD_OFFSET), .cy = ScaleY(DPAD_CY),
+                .radius = ScaleX(DPAD_BTN_R), .btnId = TOUCH_BTN_DPAD_RIGHT, .visible = true
+            };
+            // Shoot button (right side) for quick-draw
+            gButtons[gButtonCount++] = (TouchButton){
+                .cx = ScaleX(BTN_SHOOT_X), .cy = ScaleY(BTN_SHOOT_Y),
                 .radius = ScaleX(BTN_RADIUS), .btnId = TOUCH_BTN_SHOOT, .visible = true
             };
             break;
