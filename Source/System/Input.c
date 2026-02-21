@@ -4,6 +4,9 @@
 
 #include "game.h"
 #include <SDL3/SDL.h>
+#ifdef __ANDROID__
+#include "touch_controls.h"
+#endif
 
 extern SDL_Window* gSDLWindow;
 
@@ -181,6 +184,9 @@ static inline const InputBinding* GetBinding(int need)
 
 void InitInput(void)
 {
+#ifdef __ANDROID__
+	TouchControls_Init();
+#endif
 }
 
 /**************** READ KEYBOARD *************/
@@ -320,6 +326,26 @@ static void UpdateInputNeeds(void)
 
 		downNow |= gMouseButtonStates[kb->mouseButton] & KEYSTATE_ACTIVE_BIT;
 
+#ifdef __ANDROID__
+		// OR in touch control inputs so virtual buttons act as additional bindings
+		switch (i)
+		{
+			case kNeed_Shoot:    downNow |= TouchControls_IsPressed(TOUCH_BTN_SHOOT);       break;
+			case kNeed_Duck:     downNow |= TouchControls_IsPressed(TOUCH_BTN_DUCK);        break;
+			case kNeed_Jump:     downNow |= TouchControls_IsPressed(TOUCH_BTN_JUMP);        break;
+			case kNeed_Left:
+			case kNeed_UILeft:   downNow |= TouchControls_IsPressed(TOUCH_BTN_DPAD_LEFT);   break;
+			case kNeed_Right:
+			case kNeed_UIRight:  downNow |= TouchControls_IsPressed(TOUCH_BTN_DPAD_RIGHT);  break;
+			case kNeed_UIUp:     downNow |= TouchControls_IsPressed(TOUCH_BTN_DPAD_UP);     break;
+			case kNeed_UIDown:   downNow |= TouchControls_IsPressed(TOUCH_BTN_DPAD_DOWN);   break;
+			case kNeed_UIConfirm: downNow |= TouchControls_IsPressed(TOUCH_BTN_CONFIRM);     break;
+			case kNeed_UIBack:   downNow |= TouchControls_IsPressed(TOUCH_BTN_BACK);        break;
+			case kNeed_UIPause:  downNow |= TouchControls_IsPressed(TOUCH_BTN_PAUSE);       break;
+			default: break;
+		}
+#endif
+
 		UpdateKeyState(&gNeedStates[i], downNow);
 	}
 }
@@ -403,6 +429,23 @@ void DoSDLMaintenance(void)
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
+#ifdef __ANDROID__
+		// Forward every event to touch controls before other processing
+		TouchControls_ProcessEvent(&event);
+
+		// Skip SDL mouse events synthesized from touch to avoid double-processing
+		if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
+			event.type == SDL_EVENT_MOUSE_BUTTON_UP)
+		{
+			if (event.button.which == SDL_TOUCH_MOUSEID)
+				continue;
+		}
+		if (event.type == SDL_EVENT_MOUSE_MOTION)
+		{
+			if (event.motion.which == SDL_TOUCH_MOUSEID)
+				continue;
+		}
+#endif
 		switch (event.type)
 		{
 			case SDL_EVENT_QUIT:
@@ -477,6 +520,11 @@ void DoSDLMaintenance(void)
 	{
 		UpdateGamepadSpecificInputNeeds(gamepadNum);
 	}
+
+#ifdef __ANDROID__
+	// Clear just-pressed/released touch flags at end of frame
+	TouchControls_Update();
+#endif
 }
 
 #pragma mark -
