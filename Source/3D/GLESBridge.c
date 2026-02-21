@@ -1336,6 +1336,10 @@ void bridge_TexImage2D(GLenum target, GLint level, GLint internalformat,
     // Convert classic Mac 1_5_5_5_REV (A1, R5, G5, B5 packed) to GL_RGBA8
     // Used by terrain textures (GL_BGRA_EXT, GL_UNSIGNED_SHORT_1_5_5_5_REV)
     if (pixels && type == GL_UNSIGNED_SHORT_1_5_5_5_REV) {
+        // When internalformat is GL_RGB the original code treated these textures as
+        // fully opaque (no alpha channel). Force alpha=255 so the alpha test
+        // (GL_NOTEQUAL, 0) doesn't discard every terrain pixel.
+        int forceOpaque = (internalformat == GL_RGB);
         const uint16_t *src = (const uint16_t*)pixels;
         uint8_t *dst = (uint8_t*)malloc((size_t)(width * height * 4));
         if (!dst) return;
@@ -1344,7 +1348,7 @@ void bridge_TexImage2D(GLenum target, GLint level, GLint internalformat,
             dst[i*4+0] = (uint8_t)(((pix >> 10) & 0x1f) * 255 / 31); // R
             dst[i*4+1] = (uint8_t)(((pix >>  5) & 0x1f) * 255 / 31); // G
             dst[i*4+2] = (uint8_t)(( pix        & 0x1f) * 255 / 31); // B
-            dst[i*4+3] = (uint8_t)((pix & 0x8000) ? 255 : 0);        // A
+            dst[i*4+3] = forceOpaque ? 255 : (uint8_t)((pix & 0x8000) ? 255 : 0); // A
         }
         glTexImage2D(target, level, GL_RGBA, width, height, border, GL_RGBA, GL_UNSIGNED_BYTE, dst);
         free(dst);

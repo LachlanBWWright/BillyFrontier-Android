@@ -475,6 +475,11 @@ static void Boot(int argc, char** argv)
 	LoadPrefs();
 
 retryVideo:
+#ifdef __ANDROID__
+	// Force landscape orientation before initializing SDL, so that SDL3's
+	// SDLActivity does not override the manifest screenOrientation setting.
+	SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+#endif
 	// Initialize SDL video subsystem
 	if (!SDL_Init(SDL_INIT_VIDEO))
 	{
