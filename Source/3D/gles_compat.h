@@ -28,9 +28,23 @@ typedef double GLdouble;
 #define GL_LUMINANCE_ALPHA 0x190A
 #endif
 
+// Anisotropic filtering extension constants (may not be in GLES3 headers)
+#ifndef GL_TEXTURE_MAX_ANISOTROPY_EXT
+#define GL_TEXTURE_MAX_ANISOTROPY_EXT     0x84FE
+#endif
+#ifndef GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT
+#define GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT 0x84FF
+#endif
+
 // Missing GL constants
 #ifndef GL_CLAMP
 #define GL_CLAMP GL_CLAMP_TO_EDGE
+#endif
+#ifndef GL_RESCALE_NORMAL
+#define GL_RESCALE_NORMAL 0x803A
+#endif
+#ifndef GL_FOG_HINT
+#define GL_FOG_HINT 0x0C54
 #endif
 #ifndef GL_QUADS
 #define GL_QUADS 0x0007
@@ -197,6 +211,12 @@ typedef double GLdouble;
 #ifndef GL_ALWAYS
 #define GL_ALWAYS 0x0207
 #endif
+#ifndef GL_LIGHT_MODEL_TWO_SIDE
+#define GL_LIGHT_MODEL_TWO_SIDE 0x0B52
+#endif
+#ifndef GL_LIGHT_MODEL_AMBIENT
+#define GL_LIGHT_MODEL_AMBIENT 0x0B53
+#endif
 
 // Bridge function declarations
 #ifdef __cplusplus
@@ -239,6 +259,7 @@ void bridge_Color4ub(GLubyte r, GLubyte g, GLubyte b, GLubyte a);
 void bridge_Lightfv(GLenum light, GLenum pname, const GLfloat *params);
 void bridge_Lightf(GLenum light, GLenum pname, GLfloat param);
 void bridge_LightModelfv(GLenum pname, const GLfloat *params);
+void bridge_LightModeli(GLenum pname, GLint param);
 void bridge_Materialfv(GLenum face, GLenum pname, const GLfloat *params);
 void bridge_Materialf(GLenum face, GLenum pname, GLfloat param);
 
@@ -330,6 +351,7 @@ void bridge_FlushState(void);
 #define glLightfv           bridge_Lightfv
 #define glLightf            bridge_Lightf
 #define glLightModelfv      bridge_LightModelfv
+#define glLightModeli       bridge_LightModeli
 #define glMaterialfv        bridge_Materialfv
 #define glMaterialf         bridge_Materialf
 

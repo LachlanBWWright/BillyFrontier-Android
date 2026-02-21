@@ -856,6 +856,11 @@ void bridge_LightModelfv(GLenum pname, const GLfloat *params) {
     }
 }
 
+void bridge_LightModeli(GLenum pname, GLint param) {
+    // GL_LIGHT_MODEL_TWO_SIDE (0x0B52) - not emulated in the bridge, silently ignored
+    (void)pname; (void)param;
+}
+
 void bridge_Materialfv(GLenum face, GLenum pname, const GLfloat *params) {
     (void)face;
     switch (pname) {
