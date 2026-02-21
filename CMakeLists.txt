@@ -92,7 +92,13 @@ else()
 	endif()
 	message("Building SDL3 from source: " ${SDL3_DIR})
 	add_subdirectory("${SDL3_DIR}" "${CMAKE_BINARY_DIR}/SDL3_bin" EXCLUDE_FROM_ALL)
+	# Update BOTH the cache and the normal-variable (normal vars shadow cache vars)
+	# so that subsequent find_package(SDL3) calls (e.g. from Pomme) search the
+	# correct binary directory where SDL3Config.cmake was generated.
 	set(SDL3_DIR "${CMAKE_BINARY_DIR}/SDL3_bin" CACHE PATH "" FORCE)
+	set(SDL3_DIR "${CMAKE_BINARY_DIR}/SDL3_bin")
+	# Pre-mark SDL3 as found so submodule find_package(SDL3) calls are idempotent.
+	set(SDL3_FOUND TRUE CACHE BOOL "SDL3 built from source" FORCE)
 endif()
 
 #------------------------------------------------------------------------------

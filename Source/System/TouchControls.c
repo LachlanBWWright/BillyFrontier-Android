@@ -81,6 +81,8 @@ static float gJoystickX = 0.0f, gJoystickY = 0.0f;
 static float gAimX = 0, gAimY = 0;
 static bool  gHasAimTouch = false;
 static SDL_FingerID gAimFingerID = 0;
+// Whether the aim touch also triggered a shoot press (rail-shooter tap-to-shoot)
+static bool  gAimTriggeredShoot = false;
 
 // Window size (set during draw or event processing)
 static int gWinW = 640, gWinH = 480;
@@ -282,6 +284,15 @@ static void TouchMap_Remove(SDL_FingerID fid) {
     }
 }
 
+// Returns true if any mapped finger is holding this button
+static bool TouchMap_HasButton(TouchButtonID btnId) {
+    for (int i = 0; i < MAX_TOUCH_FINGERS; i++) {
+        if (gTouchMap[i].active && gTouchMap[i].btnId == btnId)
+            return true;
+    }
+    return false;
+}
+
 // ============================================================================
 // Public API
 // ============================================================================
@@ -292,6 +303,7 @@ void TouchControls_Init(void) {
     gJsActive = false;
     gJoystickX = gJoystickY = 0.0f;
     gHasAimTouch = false;
+    gAimTriggeredShoot = false;
     gScheme = TOUCH_SCHEME_MENU;
     RebuildLayout();
 }
@@ -309,6 +321,7 @@ void TouchControls_SetScheme(TouchControlScheme scheme) {
     gJsActive = false;
     gJoystickX = gJoystickY = 0.0f;
     gHasAimTouch = false;
+    gAimTriggeredShoot = false;
     RebuildLayout();
 }
 
@@ -367,15 +380,19 @@ void TouchControls_ProcessEvent(const SDL_Event* event) {
             touchX = event->tfinger.x * gWinW;
             touchY = event->tfinger.y * gWinH;
 
-            // For shootout/target: track aim touch on left side
+            // For shootout/target: tap ANYWHERE that isn't a button aims the crosshair there
+            // and immediately fires a shot (rail-shooter style controls).
             if ((gScheme == TOUCH_SCHEME_SHOOTOUT || gScheme == TOUCH_SCHEME_TARGET)
-                && !IsRightSideTouch(touchX) && !gHasAimTouch
+                && !gHasAimTouch
                 && HitTestButton(touchX, touchY) == NULL)
             {
                 gAimX = touchX;
                 gAimY = touchY;
                 gHasAimTouch = true;
                 gAimFingerID = event->tfinger.fingerID;
+                // Immediately count as a shoot at this point
+                gAimTriggeredShoot = true;
+                SetPressed(TOUCH_BTN_SHOOT, true);
                 break;
             }
 
@@ -449,6 +466,12 @@ void TouchControls_ProcessEvent(const SDL_Event* event) {
             // Release aim
             if (gHasAimTouch && event->tfinger.fingerID == gAimFingerID) {
                 gHasAimTouch = false;
+                // Release shoot if the aim tap triggered it (and no dedicated shoot button finger)
+                if (gAimTriggeredShoot) {
+                    gAimTriggeredShoot = false;
+                    if (!TouchMap_HasButton(TOUCH_BTN_SHOOT))
+                        SetPressed(TOUCH_BTN_SHOOT, false);
+                }
                 break;
             }
 

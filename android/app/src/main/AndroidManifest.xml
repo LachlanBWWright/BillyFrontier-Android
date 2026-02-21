@@ -13,8 +13,7 @@
             android:name="io.jor.billyfrontier.BillyFrontierActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboard|keyboardHidden|screenLayout|uiMode"
-            android:screenOrientation="sensorLandscape"
-            android:resizableActivity="false">
+            android:screenOrientation="sensorLandscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

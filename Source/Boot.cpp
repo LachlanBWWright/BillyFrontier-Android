@@ -521,6 +521,11 @@ retryVideo:
 		}
 	}
 
+#ifdef __ANDROID__
+	// Hide the mouse cursor on Android (finger taps are the input method)
+	SDL_HideCursor();
+#endif
+
 	// Init gamepad subsystem
 	SDL_Init(SDL_INIT_GAMEPAD);
 	auto gamecontrollerdbPath8 = (dataPath / "System" / "gamecontrollerdb.txt").u8string();

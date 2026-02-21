@@ -15,6 +15,9 @@ typedef double GLdouble;
 #ifndef GL_BGRA
 #define GL_BGRA  0x80E1
 #endif
+#ifndef GL_BGRA_EXT
+#define GL_BGRA_EXT GL_BGRA
+#endif
 #ifndef GL_BGR
 #define GL_BGR   0x80E0
 #endif
@@ -218,6 +221,55 @@ typedef double GLdouble;
 #define GL_LIGHT_MODEL_AMBIENT 0x0B53
 #endif
 
+// Multi-texture combine constants (OpenGL 1.3, not in GLES3 headers)
+#ifndef GL_COMBINE
+#define GL_COMBINE      0x8570
+#endif
+#ifndef GL_COMBINE_RGB
+#define GL_COMBINE_RGB  0x8571
+#endif
+#ifndef GL_COMBINE_ALPHA
+#define GL_COMBINE_ALPHA 0x8572
+#endif
+
+// Pixel format (OpenGL, not in GLES3)
+#ifndef GL_UNSIGNED_SHORT_1_5_5_5_REV
+#define GL_UNSIGNED_SHORT_1_5_5_5_REV 0x8366
+#endif
+
+// Polygon mode (desktop OpenGL only, not in GLES3 – stubs are added below)
+#ifndef GL_LINE
+#define GL_LINE 0x1B01
+#endif
+#ifndef GL_FILL
+#define GL_FILL 0x1B02
+#endif
+
+// GetFloatv / GetIntegerv queries not in GLES3
+#ifndef GL_PROJECTION_MATRIX
+#define GL_PROJECTION_MATRIX 0x0BA7
+#endif
+#ifndef GL_MODELVIEW_MATRIX
+#define GL_MODELVIEW_MATRIX 0x0BA6
+#endif
+#ifndef GL_CURRENT_COLOR
+#define GL_CURRENT_COLOR 0x0B00
+#endif
+#ifndef GL_BLEND_SRC
+#define GL_BLEND_SRC GL_BLEND_SRC_RGB
+#endif
+#ifndef GL_BLEND_DST
+#define GL_BLEND_DST GL_BLEND_DST_RGB
+#endif
+
+// Error codes (old OpenGL, not in GLES3)
+#ifndef GL_STACK_OVERFLOW
+#define GL_STACK_OVERFLOW 0x0503
+#endif
+#ifndef GL_STACK_UNDERFLOW
+#define GL_STACK_UNDERFLOW 0x0504
+#endif
+
 // Bridge function declarations
 #ifdef __cplusplus
 extern "C" {
@@ -239,6 +291,9 @@ void bridge_Scalef(GLfloat x, GLfloat y, GLfloat z);
 void bridge_Ortho(GLdouble l, GLdouble r, GLdouble b, GLdouble t, GLdouble n, GLdouble f);
 void bridge_Frustum(GLdouble l, GLdouble r, GLdouble b, GLdouble t, GLdouble n, GLdouble f);
 void bridge_LoadMatrixf(const GLfloat *m);
+
+// State queries (bridge-tracked values)
+void bridge_GetFloatv(GLenum pname, GLfloat *params);
 
 // Immediate mode
 void bridge_Begin(GLenum mode);
@@ -395,6 +450,9 @@ void bridge_FlushState(void);
 // Texture operations
 #define glTexImage2D        bridge_TexImage2D
 #define glTexSubImage2D     bridge_TexSubImage2D
+
+// State queries (for bridge-tracked values like PROJECTION_MATRIX, CURRENT_COLOR)
+#define glGetFloatv         bridge_GetFloatv
 
 #endif // !GLES_BRIDGE_IMPLEMENTATION
 

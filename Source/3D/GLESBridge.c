@@ -1190,6 +1190,23 @@ void bridge_PolygonMode(GLenum face, GLenum mode) {
     // Silently ignored — GLES3 has no polygon mode support
 }
 
+void bridge_GetFloatv(GLenum pname, GLfloat *params) {
+    switch (pname) {
+        case 0x0BA7: // GL_PROJECTION_MATRIX — return from software stack
+            memcpy(params, &gProjStack.stack[gProjStack.top], 16 * sizeof(GLfloat));
+            break;
+        case 0x0BA6: // GL_MODELVIEW_MATRIX — return from software stack
+            memcpy(params, &gMVStack.stack[gMVStack.top], 16 * sizeof(GLfloat));
+            break;
+        case 0x0B00: // GL_CURRENT_COLOR — return from bridge state
+            memcpy(params, gState.currentColor, 4 * sizeof(GLfloat));
+            break;
+        default:
+            glGetFloatv(pname, params);
+            break;
+    }
+}
+
 // ============================================================================
 // Texture format conversion
 // ============================================================================
