@@ -275,6 +275,9 @@ typedef double GLdouble;
 extern "C" {
 #endif
 
+// Active texture unit tracking (intercept so per-unit state works correctly)
+void bridge_ActiveTexture(GLenum unit);
+
 // Initialization
 void GLESBridge_Init(void);
 void GLESBridge_Shutdown(void);
@@ -468,6 +471,9 @@ void bridge_FlushState(void);
 
 // glHint — filter non-GLES3 targets (GL_FOG_HINT etc.) to avoid GL_INVALID_ENUM
 #define glHint              bridge_Hint
+
+// glActiveTexture — intercept to track the active unit for per-unit state
+#define glActiveTexture     bridge_ActiveTexture
 
 #endif // !GLES_BRIDGE_IMPLEMENTATION
 

@@ -31,11 +31,11 @@
 #define BTN_JUMP_X  0.90f
 #define BTN_JUMP_Y  0.60f
 
-// D-pad (left side, used in menu mode)
-#define DPAD_CX     0.12f
-#define DPAD_CY     0.72f
-#define DPAD_BTN_R  0.06f
-#define DPAD_OFFSET 0.10f  // distance from center to each arrow
+// D-pad (left side, used in duel mode and menu mode)
+#define DPAD_CX     0.16f
+#define DPAD_CY     0.75f
+#define DPAD_BTN_R  0.040f
+#define DPAD_OFFSET 0.115f  // distance from center to each arrow
 
 // Duel arrows (left/right sides)
 #define DUEL_LEFT_X  0.12f
@@ -580,6 +580,9 @@ static void DrawArrow(float cx, float cy, float size, int dir) {
 // ============================================================================
 
 void TouchControls_Draw(int windowW, int windowH) {
+    // Don't draw the overlay on menu/level-select screens — no in-game controls needed
+    if (gScheme == TOUCH_SCHEME_MENU) return;
+
     if (windowW != gWinW || windowH != gWinH) {
         gWinW = windowW;
         gWinH = windowH;

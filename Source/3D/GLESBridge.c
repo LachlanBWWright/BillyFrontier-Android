@@ -65,6 +65,9 @@ static GLenum gCurrentMatrixMode = GL_MODELVIEW;
 // Whether GL_EXT_texture_filter_anisotropic is available (detected in GLESBridge_Init)
 static int gHasAnisotropyExt = 0;
 
+// Active texture unit (0 or 1) tracked so per-unit TexEnvi/Enable/Disable work correctly
+static int gActiveTexUnit = 0;
+
 static MatrixStack* CurrentStack(void) {
     switch (gCurrentMatrixMode) {
         case GL_PROJECTION: return &gProjStack;
@@ -126,7 +129,11 @@ typedef struct {
     // Texture
     int   texture2DEnabled;
     int   texEnvMode;      // GL_MODULATE, GL_REPLACE, GL_DECAL, GL_ADD
-    int   texGenEnabled;   // sphere map
+    int   texGenEnabled;   // sphere map (tracked for bridge_IsEnabled, not used in shader directly)
+
+    // Multi-texture (sphere map on unit 1 via MULTI_TEXTURE_MODE_REFLECTIONSPHERE)
+    int   multiTextureEnabled;   // unit 1 texture is active
+    int   texEnvMode1;           // GL_COMBINE_RGB value for unit 1 (GL_ADD=0x0104 or GL_MODULATE=0x2100)
 
     // Current color (for no-lighting mode)
     float currentColor[4];
@@ -185,9 +192,12 @@ static GLint gUniAlphaFunc = -1;
 static GLint gUniAlphaRef = -1;
 static GLint gUniTexture2DEnabled = -1;
 static GLint gUniTexEnvMode = -1;
-static GLint gUniTexGenEnabled = -1;
+// gUniTexGenEnabled removed: texGenEnabled is now tracked in bridge state only (not uploaded to shader)
 static GLint gUniTexture0 = -1;
 static GLint gUniCurrentColor = -1;
+static GLint gUniTexture1 = -1;
+static GLint gUniMultiTextureEnabled = -1;
+static GLint gUniTexEnvMode1 = -1;
 
 static const char* kVertexShaderSrc =
     "#version 300 es\n"
@@ -203,7 +213,6 @@ static const char* kVertexShaderSrc =
     "uniform mat4 u_texMatrix;\n"
     "uniform bool u_lightingEnabled;\n"
     "uniform bool u_normalizeEnabled;\n"
-    "uniform bool u_texGenEnabled;\n"
     "uniform bool u_colorMaterialEnabled;\n"
     "\n"
     "struct Light {\n"
@@ -224,21 +233,23 @@ static const char* kVertexShaderSrc =
     "\n"
     "out vec4 v_color;\n"
     "out vec2 v_texcoord;\n"
+    "out vec2 v_texcoord_sphere;\n"
     "\n"
     "void main() {\n"
     "    gl_Position = u_mvp * vec4(a_position, 1.0);\n"
     "\n"
-    "    if (u_texGenEnabled) {\n"
-    "        // Sphere map\n"
-    "        vec3 eyePos = (u_mv * vec4(a_position, 1.0)).xyz;\n"
-    "        vec3 n = a_normal;\n"
-    "        if (u_normalizeEnabled) n = normalize(n);\n"
-    "        vec3 eyeNormal = normalize(mat3(u_mv) * n);\n"
-    "        vec3 r = reflect(normalize(eyePos), eyeNormal);\n"
-    "        float m = 2.0 * sqrt(r.x*r.x + r.y*r.y + (r.z+1.0)*(r.z+1.0));\n"
-    "        v_texcoord = vec2(r.x/m + 0.5, r.y/m + 0.5);\n"
-    "    } else {\n"
-    "        v_texcoord = (u_texMatrix * vec4(a_texcoord, 0.0, 1.0)).xy;\n"
+    "    // Unit 0: always use mesh UVs\n"
+    "    v_texcoord = (u_texMatrix * vec4(a_texcoord, 0.0, 1.0)).xy;\n"
+    "    // Unit 1 sphere map coords (computed always; frag shader uses only when multiTextureEnabled)\n"
+    "    {\n"
+    "        const float kEps = 1e-4;\n"
+    "        vec3 sp = (u_mv * vec4(a_position, 1.0)).xyz;\n"
+    "        vec3 sn = a_normal;\n"
+    "        if (u_normalizeEnabled) sn = normalize(sn);\n"
+    "        vec3 sen = normalize(mat3(u_mv) * sn);\n"
+    "        vec3 sr = reflect(normalize(sp), sen);\n"
+    "        float sm = 2.0 * sqrt(sr.x*sr.x + sr.y*sr.y + (sr.z+1.0)*(sr.z+1.0));\n"
+    "        v_texcoord_sphere = sm > kEps ? vec2(sr.x/sm + 0.5, sr.y/sm + 0.5) : vec2(0.5, 0.5);\n"
     "    }\n"
     "\n"
     "    if (u_lightingEnabled) {\n"
@@ -281,10 +292,14 @@ static const char* kFragmentShaderSrc =
     "\n"
     "in vec4 v_color;\n"
     "in vec2 v_texcoord;\n"
+    "in vec2 v_texcoord_sphere;\n"
     "\n"
     "uniform sampler2D u_texture0;\n"
+    "uniform sampler2D u_texture1;\n"
     "uniform bool u_texture2DEnabled;\n"
+    "uniform bool u_multiTextureEnabled;\n"
     "uniform int  u_texEnvMode;\n"
+    "uniform int  u_texEnvMode1;\n"
     "uniform bool u_alphaTestEnabled;\n"
     "uniform int  u_alphaFunc;\n"
     "uniform float u_alphaRef;\n"
@@ -313,6 +328,16 @@ static const char* kFragmentShaderSrc =
     "            color.a *= texColor.a;\n"
     "        } else {\n"
     "            color *= texColor;\n"
+    "        }\n"
+    "        // Unit 1: sphere map (MULTI_TEXTURE_MODE_REFLECTIONSPHERE)\n"
+    "        if (u_multiTextureEnabled) {\n"
+    "            vec4 sc = texture(u_texture1, v_texcoord_sphere);\n"
+    "            if (u_texEnvMode1 == 0x0104) {\n"
+    "                color.rgb = min(color.rgb + sc.rgb, 1.0);\n"
+    "                color.a *= sc.a;\n"
+    "            } else {\n"
+    "                color *= sc;\n"
+    "            }\n"
     "        }\n"
     "    }\n"
     "\n"
@@ -442,6 +467,8 @@ void GLESBridge_Init(void) {
     gState.fogDensity = 1.0f;
     gState.fogMode = GL_EXP;
     gState.texEnvMode = GL_MODULATE;
+    gState.texEnvMode1 = GL_MODULATE;
+    gState.multiTextureEnabled = 0;
     for (int i = 0; i < MAX_LIGHTS; i++) {
         gState.lights[i].diffuse[0] = gState.lights[i].diffuse[1] = gState.lights[i].diffuse[2] = 1.0f;
         gState.lights[i].diffuse[3] = 1.0f;
@@ -464,7 +491,6 @@ void GLESBridge_Init(void) {
     gUniLightingEnabled  = glGetUniformLocation(gProgram, "u_lightingEnabled");
     gUniNormalizeEnabled = glGetUniformLocation(gProgram, "u_normalizeEnabled");
     gUniColorMaterialEnabled = glGetUniformLocation(gProgram, "u_colorMaterialEnabled");
-    gUniTexGenEnabled    = glGetUniformLocation(gProgram, "u_texGenEnabled");
     gUniAmbientLight     = glGetUniformLocation(gProgram, "u_ambientLight");
     gUniMatAmbient       = glGetUniformLocation(gProgram, "u_matAmbient");
     gUniMatDiffuse       = glGetUniformLocation(gProgram, "u_matDiffuse");
@@ -483,6 +509,9 @@ void GLESBridge_Init(void) {
     gUniTexture2DEnabled = glGetUniformLocation(gProgram, "u_texture2DEnabled");
     gUniTexEnvMode       = glGetUniformLocation(gProgram, "u_texEnvMode");
     gUniTexture0         = glGetUniformLocation(gProgram, "u_texture0");
+    gUniTexture1         = glGetUniformLocation(gProgram, "u_texture1");
+    gUniMultiTextureEnabled = glGetUniformLocation(gProgram, "u_multiTextureEnabled");
+    gUniTexEnvMode1      = glGetUniformLocation(gProgram, "u_texEnvMode1");
     gUniCurrentColor     = glGetUniformLocation(gProgram, "u_currentColor");
 
     char lightName[64];
@@ -569,7 +598,6 @@ void bridge_FlushState(void) {
     glUniform1i(gUniLightingEnabled,      gState.lightingEnabled);
     glUniform1i(gUniNormalizeEnabled,     gState.normalizeEnabled);
     glUniform1i(gUniColorMaterialEnabled, gState.colorMaterialEnabled);
-    glUniform1i(gUniTexGenEnabled,        gState.texGenEnabled);
     glUniform4fv(gUniAmbientLight, 1, gState.ambientLight);
     glUniform4fv(gUniMatAmbient,   1, gState.materialAmbient);
     glUniform4fv(gUniMatDiffuse,   1, gState.materialDiffuse);
@@ -600,8 +628,12 @@ void bridge_FlushState(void) {
     glUniform1f(gUniAlphaRef,         gState.alphaRef);
 
     // Texture
+    glUniform1i(gUniTexture0,         0);   // sampler unit 0
+    glUniform1i(gUniTexture1,         1);   // sampler unit 1
     glUniform1i(gUniTexture2DEnabled, gState.texture2DEnabled);
     glUniform1i(gUniTexEnvMode,       gState.texEnvMode);
+    glUniform1i(gUniMultiTextureEnabled, gState.multiTextureEnabled);
+    glUniform1i(gUniTexEnvMode1,      gState.texEnvMode1);
 }
 
 // ============================================================================
@@ -939,11 +971,30 @@ void bridge_AlphaFunc(GLenum func, GLfloat ref) {
 }
 
 // ============================================================================
+// Active texture unit tracking
+// ============================================================================
+
+void bridge_ActiveTexture(GLenum unit) {
+    gActiveTexUnit = (unit == GL_TEXTURE1) ? 1 : 0;
+    glActiveTexture(unit);
+}
+
+// ============================================================================
 // Texture environment
 // ============================================================================
 
 void bridge_TexEnvi(GLenum target, GLenum pname, GLint param) {
     (void)target;
+    if (gActiveTexUnit == 1) {
+        // Unit 1 (sphere map): track the combine RGB mode
+        if (pname == GL_COMBINE_RGB) {
+            gState.texEnvMode1 = (int)param;   // GL_ADD or GL_MODULATE
+            gState.dirty = 1;
+        }
+        // GL_TEXTURE_ENV_MODE GL_COMBINE etc. on unit 1 — no additional action needed
+        return;
+    }
+    // Unit 0
     if (pname == GL_TEXTURE_ENV_MODE) {
         gState.texEnvMode = (int)param;
         gState.dirty = 1;
@@ -960,7 +1011,8 @@ void bridge_TexEnvfv(GLenum target, GLenum pname, const GLfloat *params) {
 
 void bridge_TexGeni(GLenum coord, GLenum pname, GLint param) {
     (void)coord;
-    if (pname == GL_TEXTURE_GEN_MODE && param == GL_SPHERE_MAP) {
+    // Sphere map texgen is only meaningful on unit 1 (the reflection layer)
+    if (gActiveTexUnit == 1 && pname == GL_TEXTURE_GEN_MODE && param == GL_SPHERE_MAP) {
         gState.texGenEnabled = 1;
         gState.dirty = 1;
     }
@@ -985,9 +1037,16 @@ void bridge_Enable(GLenum cap) {
         case GL_COLOR_MATERIAL:
             gState.colorMaterialEnabled = 1; gState.dirty = 1; return;
         case GL_TEXTURE_GEN_S: case GL_TEXTURE_GEN_T:
-            gState.texGenEnabled = 1; gState.dirty = 1; return;
+            // Sphere map texgen only matters on unit 1
+            if (gActiveTexUnit == 1) { gState.texGenEnabled = 1; gState.dirty = 1; }
+            return;
         case GL_TEXTURE_2D:
-            gState.texture2DEnabled = 1; gState.dirty = 1; return;
+            if (gActiveTexUnit == 1) {
+                gState.multiTextureEnabled = 1; gState.dirty = 1;
+            } else {
+                gState.texture2DEnabled = 1; gState.dirty = 1;
+            }
+            return;
         // Client-state enums are not valid in GLES3 core glEnable — ignore them
         case GL_VERTEX_ARRAY: case GL_NORMAL_ARRAY:
         case GL_COLOR_ARRAY:  case GL_TEXTURE_COORD_ARRAY:
@@ -1015,9 +1074,15 @@ void bridge_Disable(GLenum cap) {
         case GL_COLOR_MATERIAL:
             gState.colorMaterialEnabled = 0; gState.dirty = 1; return;
         case GL_TEXTURE_GEN_S: case GL_TEXTURE_GEN_T:
-            gState.texGenEnabled = 0; gState.dirty = 1; return;
+            if (gActiveTexUnit == 1) { gState.texGenEnabled = 0; gState.dirty = 1; }
+            return;
         case GL_TEXTURE_2D:
-            gState.texture2DEnabled = 0; gState.dirty = 1; return;
+            if (gActiveTexUnit == 1) {
+                gState.multiTextureEnabled = 0; gState.dirty = 1;
+            } else {
+                gState.texture2DEnabled = 0; gState.dirty = 1;
+            }
+            return;
         case GL_VERTEX_ARRAY: case GL_NORMAL_ARRAY:
         case GL_COLOR_ARRAY:  case GL_TEXTURE_COORD_ARRAY:
             return;
