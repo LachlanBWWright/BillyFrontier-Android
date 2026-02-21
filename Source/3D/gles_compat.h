@@ -295,6 +295,8 @@ void bridge_FlushState(void);
 #endif
 
 // Redirect all fixed-function calls to bridge functions
+// (not applied inside GLESBridge.c itself to avoid infinite recursion)
+#ifndef GLES_BRIDGE_IMPLEMENTATION
 
 // Matrix
 #define glMatrixMode        bridge_MatrixMode
@@ -371,5 +373,7 @@ void bridge_FlushState(void);
 // Texture operations
 #define glTexImage2D        bridge_TexImage2D
 #define glTexSubImage2D     bridge_TexSubImage2D
+
+#endif // !GLES_BRIDGE_IMPLEMENTATION
 
 #endif // __ANDROID__

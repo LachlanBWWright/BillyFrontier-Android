@@ -10,6 +10,9 @@
 #include <math.h>
 #include <android/log.h>
 
+// Define this before including gles_compat.h so the macro redirects are NOT
+// applied inside this file (would cause infinite recursion).
+#define GLES_BRIDGE_IMPLEMENTATION
 #include "gles_compat.h"
 
 #define BRIDGE_TAG "BillyFrontier"
