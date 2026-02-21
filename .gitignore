@@ -9,3 +9,9 @@ dist/
 .idea/
 .DS_Store
 *.user
+
+# Android build artifacts
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties

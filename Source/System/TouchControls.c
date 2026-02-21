@@ -6,7 +6,6 @@
 #include "game.h"
 #include "touch_controls.h"
 #include "main.h"
-#include "gles_compat.h"
 #include <GLES3/gl3.h>
 #include <math.h>
 #include <string.h>
@@ -655,7 +654,12 @@ void TouchControls_Draw(int windowW, int windowH) {
     bridge_MatrixMode(GL_MODELVIEW);
     bridge_PopMatrix();
 
+    // Restore GL state
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
+    bridge_Enable(GL_LIGHTING);
+    bridge_FlushState();
 }
 
 #endif // __ANDROID__

@@ -39,6 +39,7 @@ jobs:
 
       - name: Install NDK and CMake
         run: |
+          yes | sdkmanager --licenses || true
           sdkmanager "ndk;27.3.13750724" "cmake;3.22.1"
 
       - name: Make gradlew executable

@@ -11,7 +11,6 @@
 
 #ifdef __ANDROID__
 #include <stdlib.h>
-#include "gles_compat.h"
 #endif
 
 extern "C"
@@ -427,7 +426,7 @@ static void Boot(int argc, char** argv)
 	if (!SDL_getenv("HOME")) {
 		const char* internalPath = SDL_GetAndroidInternalStoragePath();
 		if (internalPath)
-			SDL_setenv("HOME", internalPath, 1);
+			SDL_setenv_unsafe("HOME", internalPath, 1);
 	}
 	// Create ~/.config directory
 	{
