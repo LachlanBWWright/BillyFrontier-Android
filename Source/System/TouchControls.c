@@ -380,8 +380,8 @@ void TouchControls_ProcessEvent(const SDL_Event* event) {
             touchX = event->tfinger.x * gWinW;
             touchY = event->tfinger.y * gWinH;
 
-            // For shootout/target: tap ANYWHERE that isn't a button aims the crosshair there
-            // and immediately fires a shot (rail-shooter style controls).
+            // For shootout/target: tap any non-button area to aim the crosshair there
+            // and immediately fire a shot (rail-shooter style controls).
             if ((gScheme == TOUCH_SCHEME_SHOOTOUT || gScheme == TOUCH_SCHEME_TARGET)
                 && !gHasAimTouch
                 && HitTestButton(touchX, touchY) == NULL)

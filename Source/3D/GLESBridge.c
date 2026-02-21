@@ -1192,13 +1192,13 @@ void bridge_PolygonMode(GLenum face, GLenum mode) {
 
 void bridge_GetFloatv(GLenum pname, GLfloat *params) {
     switch (pname) {
-        case 0x0BA7: // GL_PROJECTION_MATRIX — return from software stack
+        case GL_PROJECTION_MATRIX: // 0x0BA7 — return from software stack
             memcpy(params, &gProjStack.stack[gProjStack.top], 16 * sizeof(GLfloat));
             break;
-        case 0x0BA6: // GL_MODELVIEW_MATRIX — return from software stack
+        case GL_MODELVIEW_MATRIX:  // 0x0BA6 — return from software stack
             memcpy(params, &gMVStack.stack[gMVStack.top], 16 * sizeof(GLfloat));
             break;
-        case 0x0B00: // GL_CURRENT_COLOR — return from bridge state
+        case GL_CURRENT_COLOR:     // 0x0B00 — return from bridge state
             memcpy(params, gState.currentColor, 4 * sizeof(GLfloat));
             break;
         default:
