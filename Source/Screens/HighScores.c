@@ -160,6 +160,14 @@ void NewScore(Boolean justShowScores)
 			{
 				gExitHighScores = true;
 			}
+#ifdef __ANDROID__
+			// On Android, also allow the CONFIRM virtual button to submit the name.
+			// This is a fallback in case the on-screen keyboard dismissal is not detected.
+			else if (GetNewNeedState(kNeed_UIConfirm))
+			{
+				gExitHighScores = true;
+			}
+#endif
 			else if (GetNewKeyState(SDL_SCANCODE_LEFT))
 			{
 				if (gCursorIndex > 0)
