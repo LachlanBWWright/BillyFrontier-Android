@@ -2,6 +2,7 @@ build*/
 cmake-build-*/
 cache/
 extern/SDL3*
+extern/SDL/
 dist/
 
 # IDEs and OS-specific stuff
@@ -9,3 +10,13 @@ dist/
 .idea/
 .DS_Store
 *.user
+
+# Android build artifacts
+android/.gradle/
+android/app/build/
+android/app/.cxx/
+android/build/
+android/local.properties
+
+# SDL3 Java bridge files - copied by CI workflow from extern/SDL
+android/app/src/main/java/org/libsdl/app/

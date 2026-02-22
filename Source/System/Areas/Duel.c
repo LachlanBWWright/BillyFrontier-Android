@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef __ANDROID__
+#include "touch_controls.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -152,6 +155,16 @@ void PlayDuel(Byte difficulty)
 			gPlayerIsDead = false;
 			break;
 		}
+
+#ifdef __ANDROID__
+		// Skip-duel button: jump straight to the underlying game by winning immediately
+		if (TouchControls_WasJustPressed(TOUCH_BTN_SKIP))
+		{
+			gPlayerToWinDuel = true;
+			gPlayerIsDead = false;
+			break;
+		}
+#endif
 		
 		if (GetNewNeedState(kNeed_UIPause))								// see if paused
 			DoPaused();

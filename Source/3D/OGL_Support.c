@@ -14,6 +14,10 @@
 #include "stb_image.h"
 #include "ogl_functions.h"
 
+#ifdef __ANDROID__
+#include "touch_controls.h"
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -115,6 +119,11 @@ float	f;
 		/* CREATE DRAW CONTEXT THAT WILL BE USED THROUGHOUT THE GAME */
 
 	OGL_CreateDrawContext();
+
+#ifdef __ANDROID__
+		/* INIT GLES BRIDGE AFTER THE GL CONTEXT IS CREATED */
+	GLESBridge_Init();
+#endif
 }
 
 
@@ -123,6 +132,9 @@ float	f;
 void OGL_Shutdown(void)
 {
 	OGL_DisposeDrawContext();
+#ifdef __ANDROID__
+	GLESBridge_Shutdown();
+#endif
 }
 
 
@@ -682,6 +694,15 @@ do_anaglyph:
 			/**************/
            	           	
            	
+#ifdef __ANDROID__
+		/* DRAW TOUCH CONTROL OVERLAY BEFORE SWAP */
+	{
+		extern int gGameWindowWidth, gGameWindowHeight;
+		TouchControls_Draw(gGameWindowWidth, gGameWindowHeight);
+		bridge_FlushState();
+	}
+#endif
+
            /* SWAP THE BUFFS */
 
 	SDL_GL_SwapWindow(gSDLWindow);					// end render loop

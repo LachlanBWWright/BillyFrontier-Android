@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef __ANDROID__
+#include "touch_controls.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -85,6 +88,13 @@ void NewScore(Boolean justShowScores)
 	gJustShowScores = justShowScores;
 		
 	gAllowAudioKeys = false;					// dont interfere with name editing
+
+#ifdef __ANDROID__
+	// Ensure the menu touch scheme is active so the CONFIRM button is visible
+	// and so that GetNewClickState(1) works (scheme-aware mouse-button suppression).
+	TouchControls_SetScheme(TOUCH_SCHEME_MENU);
+#endif
+
 	SDL_StartTextInput(gSDLWindow);
 
 	gCursorIndex = 0;
@@ -109,6 +119,12 @@ void NewScore(Boolean justShowScores)
 			
 	MyFlushEvents();
 	CalcFramesPerSecond();
+
+#ifdef __ANDROID__
+	// Track whether the on-screen keyboard was ever visible so we can detect dismissal.
+	// When it becomes hidden after having been shown, submit the name automatically.
+	bool androidKbWasShown = false;
+#endif
 		
 	while(!gExitHighScores)
 	{
@@ -144,6 +160,14 @@ void NewScore(Boolean justShowScores)
 			{
 				gExitHighScores = true;
 			}
+#ifdef __ANDROID__
+			// On Android, also allow the CONFIRM virtual button to submit the name.
+			// This is a fallback in case the on-screen keyboard dismissal is not detected.
+			else if (GetNewNeedState(kNeed_UIConfirm))
+			{
+				gExitHighScores = true;
+			}
+#endif
 			else if (GetNewKeyState(SDL_SCANCODE_LEFT))
 			{
 				if (gCursorIndex > 0)
@@ -190,6 +214,18 @@ void NewScore(Boolean justShowScores)
 					gCursorIndex++;
 				}
 			}
+
+#ifdef __ANDROID__
+			// Detect when the Android on-screen keyboard is dismissed: treat it as ENTER.
+			// This lets the player close the keyboard to confirm their name.
+			{
+				bool kbShown = SDL_ScreenKeyboardShown(gSDLWindow);
+				if (kbShown)
+					androidKbWasShown = true;
+				if (!kbShown && androidKbWasShown)
+					gExitHighScores = true;		// keyboard closed → submit
+			}
+#endif
 		}
 	}	
 

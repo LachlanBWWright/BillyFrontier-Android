@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef __ANDROID__
+#include "touch_controls.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -126,7 +129,10 @@ uint32_t	oldScore;
 				/**********************/
 				/* SHOW THE BIG-BOARD */
 				/**********************/
-				
+
+#ifdef __ANDROID__
+		TouchControls_SetScheme(TOUCH_SCHEME_MENU);
+#endif
 		DoBigBoardScreen();		
 		if (gGameOver)						// did user want to bail?
 			break;
@@ -144,7 +150,9 @@ uint32_t	oldScore;
 		gCurrentArea--;							// dec by 1 so that we're on the duel for this mini-game
 		if (!IsDuelWon(gCurrentArea/2))			// see if already won this previously
 		{
-
+#ifdef __ANDROID__
+			TouchControls_SetScheme(TOUCH_SCHEME_DUEL);
+#endif
 			PlayDuel(gCurrentArea / 2);
 
 
@@ -184,6 +192,9 @@ uint32_t	oldScore;
 			        
 			case	AREA_TOWN_SHOOTOUT:
 			case	AREA_SWAMP_SHOOTOUT:
+#ifdef __ANDROID__
+					TouchControls_SetScheme(TOUCH_SCHEME_SHOOTOUT);
+#endif
 					PlayShootout();
 					break;
 
@@ -192,6 +203,9 @@ uint32_t	oldScore;
 			        
 			case	AREA_TOWN_STAMPEDE:
 			case	AREA_SWAMP_STAMPEDE:
+#ifdef __ANDROID__
+					TouchControls_SetScheme(TOUCH_SCHEME_STAMPEDE);
+#endif
 					PlayStampede();
 					break;
 					
@@ -200,6 +214,9 @@ uint32_t	oldScore;
 					
 			case	AREA_TARGETPRACTICE1:
 			case	AREA_TARGETPRACTICE2:
+#ifdef __ANDROID__
+					TouchControls_SetScheme(TOUCH_SCHEME_TARGET);
+#endif
 					PlayTargetPractice();
 					break;
 		}				
@@ -381,6 +398,9 @@ unsigned long	someLong;
 	{		
 		MyFlushEvents();
 
+#ifdef __ANDROID__
+		TouchControls_SetScheme(TOUCH_SCHEME_MENU);
+#endif
 		DoMainMenuScreen(0);
 						
 		PlayGame_Arcade();

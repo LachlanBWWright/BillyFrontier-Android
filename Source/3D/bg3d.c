@@ -802,6 +802,9 @@ void				*pixels;
 					
 			if (matData->pixelSrcFormat == GL_UNSIGNED_SHORT_1_5_5_5_REV)
 			{
+#if !(__BIG_ENDIAN__)
+				ByteswapInts(sizeof(uint16_t), w*h, pixels);	// big-endian file → little-endian
+#endif
 				matData->textureName[0] = OGL_TextureMap_Load(pixels, w, h, GL_BGRA, GL_RGBA, GL_UNSIGNED_SHORT_1_5_5_5_REV); // load 16 as 16
 			}
 			

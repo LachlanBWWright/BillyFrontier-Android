@@ -4,6 +4,9 @@
 
 #include "game.h"
 #include <SDL3/SDL.h>
+#ifdef __ANDROID__
+#include "touch_controls.h"
+#endif
 
 extern SDL_Window* gSDLWindow;
 
@@ -181,6 +184,9 @@ static inline const InputBinding* GetBinding(int need)
 
 void InitInput(void)
 {
+#ifdef __ANDROID__
+	TouchControls_Init();
+#endif
 }
 
 /**************** READ KEYBOARD *************/
@@ -288,12 +294,29 @@ static void ParseAltEnter(void)
 
 static void UpdateMouseButtonStates(int mouseWheelDelta)
 {
-	uint32_t mouseButtons = SDL_GetMouseState(NULL, NULL);
-
-	for (int i = 1; i < NUM_SUPPORTED_MOUSE_BUTTONS_PURESDL; i++)	// SDL buttons start at 1!
+#ifdef __ANDROID__
+	// In gameplay modes, SDL synthesises a left-mouse-button press for every touch,
+	// which maps to kNeed_Shoot (SDL_BUTTON_LEFT binding) and fires the gun even when
+	// tapping a virtual button (duck, jump, etc.).  Skip mouse button state in those
+	// modes; touch input is handled via the finger-event system instead.
+	// In menu mode we DO allow mouse state to update so that BigBoard click-selection
+	// (which uses GetNewClickState(1)) keeps working via touch-to-mouse synthesis.
+	if (TouchControls_GetScheme() != TOUCH_SCHEME_MENU)
 	{
-		bool buttonBit = 0 != (mouseButtons & SDL_BUTTON_MASK(i));
-		UpdateKeyState(&gMouseButtonStates[i], buttonBit);
+		// Gameplay mode: skip SDL mouse button state entirely; flush to keep state machine clean
+		for (int i = 1; i < NUM_SUPPORTED_MOUSE_BUTTONS_PURESDL; i++)
+			UpdateKeyState(&gMouseButtonStates[i], false);
+	}
+	else
+#endif
+	{
+		uint32_t mouseButtons = SDL_GetMouseState(NULL, NULL);
+
+		for (int i = 1; i < NUM_SUPPORTED_MOUSE_BUTTONS_PURESDL; i++)	// SDL buttons start at 1!
+		{
+			bool buttonBit = 0 != (mouseButtons & SDL_BUTTON_MASK(i));
+			UpdateKeyState(&gMouseButtonStates[i], buttonBit);
+		}
 	}
 
 	// Fake buttons for mouse wheel up/down
@@ -319,6 +342,27 @@ static void UpdateInputNeeds(void)
 		}
 
 		downNow |= gMouseButtonStates[kb->mouseButton] & KEYSTATE_ACTIVE_BIT;
+
+#ifdef __ANDROID__
+		// OR in touch control inputs so virtual buttons act as additional bindings
+		switch (i)
+		{
+			case kNeed_Shoot:    downNow |= TouchControls_IsPressed(TOUCH_BTN_SHOOT);       break;
+			case kNeed_Duck:     downNow |= TouchControls_IsPressed(TOUCH_BTN_DUCK);        break;
+			case kNeed_Jump:     downNow |= TouchControls_IsPressed(TOUCH_BTN_JUMP);        break;
+			case kNeed_Left:
+			case kNeed_UILeft:   downNow |= TouchControls_IsPressed(TOUCH_BTN_DPAD_LEFT);   break;
+			case kNeed_Right:
+			case kNeed_UIRight:  downNow |= TouchControls_IsPressed(TOUCH_BTN_DPAD_RIGHT);  break;
+			case kNeed_UIUp:     downNow |= TouchControls_IsPressed(TOUCH_BTN_DPAD_UP);     break;
+			case kNeed_UIDown:   downNow |= TouchControls_IsPressed(TOUCH_BTN_DPAD_DOWN);   break;
+			case kNeed_UIConfirm: downNow |= TouchControls_IsPressed(TOUCH_BTN_CONFIRM);     break;
+			case kNeed_UIBack:   downNow |= TouchControls_IsPressed(TOUCH_BTN_BACK);        break;
+			case kNeed_UIPause:  downNow |= TouchControls_IsPressed(TOUCH_BTN_PAUSE);       break;
+			case kNeed_Continue: downNow |= TouchControls_IsPressed(TOUCH_BTN_CONTINUE);    break;
+			default: break;
+		}
+#endif
 
 		UpdateKeyState(&gNeedStates[i], downNow);
 	}
@@ -403,6 +447,19 @@ void DoSDLMaintenance(void)
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
+#ifdef __ANDROID__
+		// Forward every event to touch controls before other processing
+		TouchControls_ProcessEvent(&event);
+
+		// Skip SDL mouse button events synthesized from touch (prevents accidental firing).
+		// Allow mouse MOTION events from touch so the crosshair can be moved by finger drag.
+		if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
+			event.type == SDL_EVENT_MOUSE_BUTTON_UP)
+		{
+			if (event.button.which == SDL_TOUCH_MOUSEID)
+				continue;
+		}
+#endif
 		switch (event.type)
 		{
 			case SDL_EVENT_QUIT:
@@ -477,6 +534,11 @@ void DoSDLMaintenance(void)
 	{
 		UpdateGamepadSpecificInputNeeds(gamepadNum);
 	}
+
+#ifdef __ANDROID__
+	// Clear just-pressed/released touch flags at end of frame
+	TouchControls_Update();
+#endif
 }
 
 #pragma mark -
