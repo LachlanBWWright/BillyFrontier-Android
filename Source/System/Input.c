@@ -294,6 +294,12 @@ static void ParseAltEnter(void)
 
 static void UpdateMouseButtonStates(int mouseWheelDelta)
 {
+#ifndef __ANDROID__
+	// On Android, skip SDL_GetMouseState-based button updates.
+	// Any touch on screen synthesises a left-mouse-button press, which maps
+	// to kNeed_Shoot and fires the gun even when the player taps a virtual
+	// button (duck, jump, etc.).  All touch input is handled through the
+	// TouchControls finger-event system; mouse button state is irrelevant.
 	uint32_t mouseButtons = SDL_GetMouseState(NULL, NULL);
 
 	for (int i = 1; i < NUM_SUPPORTED_MOUSE_BUTTONS_PURESDL; i++)	// SDL buttons start at 1!
@@ -301,6 +307,7 @@ static void UpdateMouseButtonStates(int mouseWheelDelta)
 		bool buttonBit = 0 != (mouseButtons & SDL_BUTTON_MASK(i));
 		UpdateKeyState(&gMouseButtonStates[i], buttonBit);
 	}
+#endif
 
 	// Fake buttons for mouse wheel up/down
 	UpdateKeyState(&gMouseButtonStates[SDL_BUTTON_WHEELUP], mouseWheelDelta < 0);
@@ -342,6 +349,7 @@ static void UpdateInputNeeds(void)
 			case kNeed_UIConfirm: downNow |= TouchControls_IsPressed(TOUCH_BTN_CONFIRM);     break;
 			case kNeed_UIBack:   downNow |= TouchControls_IsPressed(TOUCH_BTN_BACK);        break;
 			case kNeed_UIPause:  downNow |= TouchControls_IsPressed(TOUCH_BTN_PAUSE);       break;
+			case kNeed_Continue: downNow |= TouchControls_IsPressed(TOUCH_BTN_CONTINUE);    break;
 			default: break;
 		}
 #endif

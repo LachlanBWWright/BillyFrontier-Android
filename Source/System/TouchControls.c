@@ -49,6 +49,16 @@
 #define PAUSE_Y     0.05f
 #define PAUSE_R     0.04f
 
+// Skip duel button (top-right corner)
+#define SKIP_X      0.92f
+#define SKIP_Y      0.08f
+#define SKIP_R      0.06f
+
+// Continue / Next Stage button (centre-bottom, shown in shootout when proceed flag is set)
+#define CONTINUE_X  0.50f
+#define CONTINUE_Y  0.88f
+#define CONTINUE_R  0.09f
+
 // ============================================================================
 // State
 // ============================================================================
@@ -98,10 +108,6 @@ static int gButtonCount = 0;
 
 static float ScaleX(float f) { return f * gWinW; }
 static float ScaleY(float f) { return f * gWinH; }
-
-static bool IsRightSideTouch(float x) {
-    return x > gWinW * 0.5f;
-}
 
 static float Dist(float ax, float ay, float bx, float by) {
     float dx = ax - bx, dy = ay - by;
@@ -183,6 +189,11 @@ static void RebuildLayout(void) {
                 .cx = ScaleX(BTN_SHOOT_X), .cy = ScaleY(BTN_SHOOT_Y),
                 .radius = ScaleX(BTN_RADIUS), .btnId = TOUCH_BTN_SHOOT, .visible = true
             };
+            // Skip-duel button (top-right corner)
+            gButtons[gButtonCount++] = (TouchButton){
+                .cx = ScaleX(SKIP_X), .cy = ScaleY(SKIP_Y),
+                .radius = ScaleX(SKIP_R), .btnId = TOUCH_BTN_SKIP, .visible = true
+            };
             break;
 
         case TOUCH_SCHEME_SHOOTOUT:
@@ -205,13 +216,27 @@ static void RebuildLayout(void) {
                 .cx = ScaleX(0.28f), .cy = ScaleY(DUEL_LEFT_Y),
                 .radius = ScaleX(DUEL_BTN_R * 0.7f), .btnId = TOUCH_BTN_DPAD_RIGHT, .visible = true
             };
+            // Continue / next-stop-point button (hidden until gShootoutCanProceedToNextStopPoint)
+            gButtons[gButtonCount++] = (TouchButton){
+                .cx = ScaleX(CONTINUE_X), .cy = ScaleY(CONTINUE_Y),
+                .radius = ScaleX(CONTINUE_R), .btnId = TOUCH_BTN_CONTINUE, .visible = false
+            };
             break;
 
         case TOUCH_SCHEME_STAMPEDE:
-            // Jump button (right side) - virtual joystick on left
+            // Jump button (right side)
             gButtons[gButtonCount++] = (TouchButton){
                 .cx = ScaleX(BTN_JUMP_X), .cy = ScaleY(BTN_JUMP_Y),
                 .radius = ScaleX(BTN_RADIUS), .btnId = TOUCH_BTN_JUMP, .visible = true
+            };
+            // Left/right movement buttons (replaces joystick; auto-run handles forward)
+            gButtons[gButtonCount++] = (TouchButton){
+                .cx = ScaleX(DPAD_CX - DPAD_OFFSET), .cy = ScaleY(DPAD_CY),
+                .radius = ScaleX(DPAD_BTN_R * 1.5f), .btnId = TOUCH_BTN_DPAD_LEFT, .visible = true
+            };
+            gButtons[gButtonCount++] = (TouchButton){
+                .cx = ScaleX(DPAD_CX + DPAD_OFFSET), .cy = ScaleY(DPAD_CY),
+                .radius = ScaleX(DPAD_BTN_R * 1.5f), .btnId = TOUCH_BTN_DPAD_RIGHT, .visible = true
             };
             break;
 
@@ -396,19 +421,8 @@ void TouchControls_ProcessEvent(const SDL_Event* event) {
                 break;
             }
 
-            // For stampede: virtual joystick on left side
-            if (gScheme == TOUCH_SCHEME_STAMPEDE && !IsRightSideTouch(touchX)
-                && HitTestButton(touchX, touchY) == NULL && !gJsActive)
-            {
-                gJsActive = true;
-                gJsBaseX = touchX;
-                gJsBaseY = touchY;
-                gJsThumbX = touchX;
-                gJsThumbY = touchY;
-                gJsFingerID = event->tfinger.fingerID;
-                gJoystickX = gJoystickY = 0.0f;
-                break;
-            }
+            // For stampede: no joystick -- left/right buttons handle movement
+            // (auto-run handles forward motion; joystick is not used)
 
             // Hit-test buttons
             TouchButton *btn = HitTestButton(touchX, touchY);
@@ -610,26 +624,17 @@ void TouchControls_Draw(int windowW, int windowH) {
 
     bridge_FlushState();
 
-    // Draw virtual joystick (stampede mode only)
-    if (gScheme == TOUCH_SCHEME_STAMPEDE) {
-        float bx = gJsActive ? gJsBaseX : ScaleX(JS_CX);
-        float by = gJsActive ? gJsBaseY : ScaleY(JS_CY);
-        float r = ScaleX(JS_RADIUS);
-
-        // Background ring
-        bridge_Color4f(0.3f, 0.3f, 0.3f, 0.2f);
-        DrawFilledCircle(bx, by, r, 32);
-        bridge_Color4f(0.7f, 0.7f, 0.7f, 0.4f);
-        DrawCircleOutline(bx, by, r, 32);
-
-        // Thumb
-        float tx = gJsActive ? gJsThumbX : bx;
-        float ty = gJsActive ? gJsThumbY : by;
-        bridge_Color4f(0.6f, 0.6f, 0.6f, 0.45f);
-        DrawFilledCircle(tx, ty, r * 0.35f, 20);
-        bridge_Color4f(0.9f, 0.9f, 0.9f, 0.5f);
-        DrawCircleOutline(tx, ty, r * 0.35f, 20);
+    // Update CONTINUE button visibility based on whether the player can proceed to next stop point
+    if (gScheme == TOUCH_SCHEME_SHOOTOUT) {
+        for (int i = 0; i < gButtonCount; i++) {
+            if (gButtons[i].btnId == TOUCH_BTN_CONTINUE) {
+                gButtons[i].visible = gShootoutCanProceedToNextStopPoint;
+                break;
+            }
+        }
     }
+
+    // Draw virtual joystick removed -- stampede now uses left/right arrow buttons
 
     // Draw buttons
     for (int i = 0; i < gButtonCount; i++) {
@@ -660,6 +665,12 @@ void TouchControls_Draw(int windowW, int windowH) {
             case TOUCH_BTN_PAUSE:
                 bridge_Color4f(0.5f, 0.5f, 0.5f, alpha * 0.6f);
                 break;
+            case TOUCH_BTN_SKIP:
+                bridge_Color4f(0.7f, 0.7f, 0.0f, alpha);  // yellow: skip duel
+                break;
+            case TOUCH_BTN_CONTINUE:
+                bridge_Color4f(0.1f, 0.7f, 0.1f, alpha + 0.15f);  // bright green: next stage
+                break;
             default:
                 bridge_Color4f(0.5f, 0.5f, 0.5f, alpha);
                 break;
@@ -670,7 +681,7 @@ void TouchControls_Draw(int windowW, int windowH) {
         bridge_Color4f(1.0f, 1.0f, 1.0f, alpha + 0.1f);
         DrawCircleOutline(b->cx, b->cy, r, 24);
 
-        // Arrow glyph for d-pad buttons
+        // Arrow glyph for d-pad buttons; forward arrow for CONTINUE; skip (>>) for SKIP
         float arrowAlpha = pressed ? 0.9f : 0.7f;
         bridge_Color4f(1.0f, 1.0f, 1.0f, arrowAlpha);
         switch (b->btnId) {
@@ -678,6 +689,12 @@ void TouchControls_Draw(int windowW, int windowH) {
             case TOUCH_BTN_DPAD_RIGHT: DrawArrow(b->cx, b->cy, r*0.45f, 1); break;
             case TOUCH_BTN_DPAD_UP:    DrawArrow(b->cx, b->cy, r*0.45f, 2); break;
             case TOUCH_BTN_DPAD_DOWN:  DrawArrow(b->cx, b->cy, r*0.45f, 3); break;
+            case TOUCH_BTN_CONTINUE:   DrawArrow(b->cx, b->cy, r*0.5f, 1); break;  // right arrow = next
+            case TOUCH_BTN_SKIP:
+                // Draw double-right-arrow (>>) for skip
+                DrawArrow(b->cx - r*0.2f, b->cy, r*0.35f, 1);
+                DrawArrow(b->cx + r*0.2f, b->cy, r*0.35f, 1);
+                break;
             default: break;
         }
     }

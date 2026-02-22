@@ -29,7 +29,9 @@ typedef enum {
     TOUCH_BTN_CONFIRM   = 7,
     TOUCH_BTN_BACK      = 8,
     TOUCH_BTN_PAUSE     = 9,
-    TOUCH_BTN_COUNT     = 10,
+    TOUCH_BTN_SKIP      = 10,   // skip duel intro
+    TOUCH_BTN_CONTINUE  = 11,   // proceed to next stop-point in shootout
+    TOUCH_BTN_COUNT     = 12,
 } TouchButtonID;
 
 // Initialize the touch control system

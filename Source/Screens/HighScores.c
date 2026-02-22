@@ -109,6 +109,12 @@ void NewScore(Boolean justShowScores)
 			
 	MyFlushEvents();
 	CalcFramesPerSecond();
+
+#ifdef __ANDROID__
+	// Track whether the on-screen keyboard was ever visible so we can detect dismissal.
+	// When it becomes hidden after having been shown, submit the name automatically.
+	bool androidKbWasShown = false;
+#endif
 		
 	while(!gExitHighScores)
 	{
@@ -190,6 +196,18 @@ void NewScore(Boolean justShowScores)
 					gCursorIndex++;
 				}
 			}
+
+#ifdef __ANDROID__
+			// Detect when the Android on-screen keyboard is dismissed: treat it as ENTER.
+			// This lets the player close the keyboard to confirm their name.
+			{
+				bool kbShown = SDL_ScreenKeyboardShown(gSDLWindow);
+				if (kbShown)
+					androidKbWasShown = true;
+				if (!kbShown && androidKbWasShown)
+					gExitHighScores = true;		// keyboard closed → submit
+			}
+#endif
 		}
 	}	
 
