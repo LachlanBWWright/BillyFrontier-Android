@@ -10,11 +10,12 @@
 
 // Touch control schemes for different game modes
 typedef enum {
-    TOUCH_SCHEME_MENU,          // D-pad + confirm/back for menus
+    TOUCH_SCHEME_MENU,          // D-pad + confirm/back for menus (no overlay drawn)
     TOUCH_SCHEME_DUEL,          // Left/right arrows + shoot button
     TOUCH_SCHEME_SHOOTOUT,      // Touch-to-aim + shoot/duck buttons
-    TOUCH_SCHEME_STAMPEDE,      // Virtual joystick + jump button
+    TOUCH_SCHEME_STAMPEDE,      // L/R movement buttons + jump button (auto-run forward)
     TOUCH_SCHEME_TARGET,        // Touch-to-aim + shoot button
+    TOUCH_SCHEME_PAUSED,        // D-pad + confirm for the pause menu (overlay IS drawn)
 } TouchControlScheme;
 
 // Virtual button IDs

@@ -294,20 +294,30 @@ static void ParseAltEnter(void)
 
 static void UpdateMouseButtonStates(int mouseWheelDelta)
 {
-#ifndef __ANDROID__
-	// On Android, skip SDL_GetMouseState-based button updates.
-	// Any touch on screen synthesises a left-mouse-button press, which maps
-	// to kNeed_Shoot and fires the gun even when the player taps a virtual
-	// button (duck, jump, etc.).  All touch input is handled through the
-	// TouchControls finger-event system; mouse button state is irrelevant.
-	uint32_t mouseButtons = SDL_GetMouseState(NULL, NULL);
-
-	for (int i = 1; i < NUM_SUPPORTED_MOUSE_BUTTONS_PURESDL; i++)	// SDL buttons start at 1!
+#ifdef __ANDROID__
+	// In gameplay modes, SDL synthesises a left-mouse-button press for every touch,
+	// which maps to kNeed_Shoot (SDL_BUTTON_LEFT binding) and fires the gun even when
+	// tapping a virtual button (duck, jump, etc.).  Skip mouse button state in those
+	// modes; touch input is handled via the finger-event system instead.
+	// In menu mode we DO allow mouse state to update so that BigBoard click-selection
+	// (which uses GetNewClickState(1)) keeps working via touch-to-mouse synthesis.
+	if (TouchControls_GetScheme() != TOUCH_SCHEME_MENU)
 	{
-		bool buttonBit = 0 != (mouseButtons & SDL_BUTTON_MASK(i));
-		UpdateKeyState(&gMouseButtonStates[i], buttonBit);
+		// Gameplay mode: skip SDL mouse button state entirely; flush to keep state machine clean
+		for (int i = 1; i < NUM_SUPPORTED_MOUSE_BUTTONS_PURESDL; i++)
+			UpdateKeyState(&gMouseButtonStates[i], false);
 	}
+	else
 #endif
+	{
+		uint32_t mouseButtons = SDL_GetMouseState(NULL, NULL);
+
+		for (int i = 1; i < NUM_SUPPORTED_MOUSE_BUTTONS_PURESDL; i++)	// SDL buttons start at 1!
+		{
+			bool buttonBit = 0 != (mouseButtons & SDL_BUTTON_MASK(i));
+			UpdateKeyState(&gMouseButtonStates[i], buttonBit);
+		}
+	}
 
 	// Fake buttons for mouse wheel up/down
 	UpdateKeyState(&gMouseButtonStates[SDL_BUTTON_WHEELUP], mouseWheelDelta < 0);

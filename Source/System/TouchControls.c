@@ -44,6 +44,10 @@
 #define DUEL_RIGHT_Y 0.75f
 #define DUEL_BTN_R   0.09f
 
+// Stampede left/right buttons are slightly larger than the standard D-pad radius
+// so they are easy to hit with a thumb while running.
+#define STAMPEDE_LR_BTN_SCALE   1.5f
+
 // Pause button
 #define PAUSE_X     0.50f
 #define PAUSE_Y     0.05f
@@ -166,6 +170,27 @@ static void RebuildLayout(void) {
             };
             break;
 
+        case TOUCH_SCHEME_PAUSED:
+            // Pause overlay: D-pad up/down for navigation + confirm for selection.
+            // Overlay IS drawn (unlike TOUCH_SCHEME_MENU which suppresses drawing).
+            gButtons[gButtonCount++] = (TouchButton){
+                .cx = ScaleX(DPAD_CX), .cy = ScaleY(DPAD_CY - DPAD_OFFSET),
+                .radius = ScaleX(DPAD_BTN_R), .btnId = TOUCH_BTN_DPAD_UP, .visible = true
+            };
+            gButtons[gButtonCount++] = (TouchButton){
+                .cx = ScaleX(DPAD_CX), .cy = ScaleY(DPAD_CY + DPAD_OFFSET),
+                .radius = ScaleX(DPAD_BTN_R), .btnId = TOUCH_BTN_DPAD_DOWN, .visible = true
+            };
+            gButtons[gButtonCount++] = (TouchButton){
+                .cx = ScaleX(BTN_SHOOT_X), .cy = ScaleY(BTN_SHOOT_Y),
+                .radius = ScaleX(BTN_RADIUS), .btnId = TOUCH_BTN_CONFIRM, .visible = true
+            };
+            gButtons[gButtonCount++] = (TouchButton){
+                .cx = ScaleX(BTN_DUCK_X), .cy = ScaleY(BTN_DUCK_Y),
+                .radius = ScaleX(BTN_RADIUS), .btnId = TOUCH_BTN_BACK, .visible = true
+            };
+            break;
+
         case TOUCH_SCHEME_DUEL:
             // Full D-pad for the key sequence (up/down/left/right arrows)
             gButtons[gButtonCount++] = (TouchButton){
@@ -232,11 +257,11 @@ static void RebuildLayout(void) {
             // Left/right movement buttons (replaces joystick; auto-run handles forward)
             gButtons[gButtonCount++] = (TouchButton){
                 .cx = ScaleX(DPAD_CX - DPAD_OFFSET), .cy = ScaleY(DPAD_CY),
-                .radius = ScaleX(DPAD_BTN_R * 1.5f), .btnId = TOUCH_BTN_DPAD_LEFT, .visible = true
+                .radius = ScaleX(DPAD_BTN_R * STAMPEDE_LR_BTN_SCALE), .btnId = TOUCH_BTN_DPAD_LEFT, .visible = true
             };
             gButtons[gButtonCount++] = (TouchButton){
                 .cx = ScaleX(DPAD_CX + DPAD_OFFSET), .cy = ScaleY(DPAD_CY),
-                .radius = ScaleX(DPAD_BTN_R * 1.5f), .btnId = TOUCH_BTN_DPAD_RIGHT, .visible = true
+                .radius = ScaleX(DPAD_BTN_R * STAMPEDE_LR_BTN_SCALE), .btnId = TOUCH_BTN_DPAD_RIGHT, .visible = true
             };
             break;
 

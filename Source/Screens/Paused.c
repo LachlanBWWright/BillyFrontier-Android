@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef __ANDROID__
+#include "touch_controls.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -57,6 +60,13 @@ void DoPaused(void)
 	SDL_SetWindowRelativeMouseMode(gSDLWindow, false);
 	SDL_ShowCursor();
 
+#ifdef __ANDROID__
+	// Switch to PAUSED scheme while paused so the D-pad + CONFIRM button appear
+	// as an overlay.  TOUCH_SCHEME_PAUSED draws the button overlay (unlike MENU).
+	TouchControlScheme prevScheme = TouchControls_GetScheme();
+	TouchControls_SetScheme(TOUCH_SCHEME_PAUSED);
+#endif
+
 	gPausedMenuSelection = 0;
 	
 	PauseAllChannels(true);
@@ -89,6 +99,11 @@ void DoPaused(void)
 	SDL_SetWindowRelativeMouseMode(gSDLWindow, hadRelativeMouse);
 	if (!wasCursorVisible)
 		SDL_HideCursor();
+
+#ifdef __ANDROID__
+	// Restore the previous touch scheme now that we're back in gameplay.
+	TouchControls_SetScheme(prevScheme);
+#endif
 }
 
 

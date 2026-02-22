@@ -10,6 +10,9 @@
 /****************************/
 
 #include "game.h"
+#ifdef __ANDROID__
+#include "touch_controls.h"
+#endif
 
 /****************************/
 /*    PROTOTYPES            */
@@ -85,6 +88,13 @@ void NewScore(Boolean justShowScores)
 	gJustShowScores = justShowScores;
 		
 	gAllowAudioKeys = false;					// dont interfere with name editing
+
+#ifdef __ANDROID__
+	// Ensure the menu touch scheme is active so the CONFIRM button is visible
+	// and so that GetNewClickState(1) works (scheme-aware mouse-button suppression).
+	TouchControls_SetScheme(TOUCH_SCHEME_MENU);
+#endif
+
 	SDL_StartTextInput(gSDLWindow);
 
 	gCursorIndex = 0;
