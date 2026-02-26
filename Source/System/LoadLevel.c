@@ -15,6 +15,7 @@
 /*    PROTOTYPES            */
 /****************************/
 
+static void MakeTerrainSpec(FSSpec *spec, const char *defaultRelPath);
 
 
 /****************************/
@@ -25,6 +26,26 @@
 /**********************/
 /*     VARIABLES      */
 /**********************/
+
+
+/***************** MAKE TERRAIN SPEC ***********************/
+//
+// Build an FSSpec for a terrain file.
+// If gDirectTerrainPath is set, use that path instead of the bundled default.
+//
+
+static void MakeTerrainSpec(FSSpec *spec, const char *defaultRelPath)
+{
+	if (gDirectTerrainPath[0] != '\0')
+	{
+		// Use the overridden terrain file (e.g. supplied by level editor via WebAssembly)
+		OSErr err = FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, gDirectTerrainPath, spec);
+		if (err == noErr)
+			return;
+	}
+
+	FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, defaultRelPath, spec);
+}
 
 
 
@@ -99,13 +120,13 @@ FSSpec	spec;
 		case	AREA_TOWN_DUEL1:
 		case	AREA_TOWN_DUEL2:
 		case	AREA_TOWN_DUEL3:
-				FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:town_duel.ter", &spec);
+				MakeTerrainSpec(&spec, ":Terrain:town_duel.ter");
 				break;
 				
 		case	AREA_SWAMP_DUEL1:
 		case	AREA_SWAMP_DUEL2:
 		case	AREA_SWAMP_DUEL3:
-				FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:swamp_duel.ter", &spec);
+				MakeTerrainSpec(&spec, ":Terrain:swamp_duel.ter");
 				break;
 	}
 	
@@ -193,11 +214,11 @@ FSSpec	spec;
 	switch(gCurrentArea)
 	{
 		case	AREA_TOWN_SHOOTOUT:
-				FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:town_shootout.ter", &spec);
+				MakeTerrainSpec(&spec, ":Terrain:town_shootout.ter");
 				break;
 
 		case	AREA_SWAMP_SHOOTOUT:
-				FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:swamp_shootout.ter", &spec);
+				MakeTerrainSpec(&spec, ":Terrain:swamp_shootout.ter");
 				break;
 	}
 
@@ -282,11 +303,11 @@ FSSpec	spec;
 	switch(gCurrentArea)
 	{
 		case	AREA_TOWN_STAMPEDE:
-				FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:town_stampede.ter", &spec);
+				MakeTerrainSpec(&spec, ":Terrain:town_stampede.ter");
 				break;
 				
 		case	AREA_SWAMP_STAMPEDE:
-				FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, ":Terrain:swamp_stampede.ter", &spec);
+				MakeTerrainSpec(&spec, ":Terrain:swamp_stampede.ter");
 				break;
 	}
 

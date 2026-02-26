@@ -135,3 +135,6 @@ void PlayTargetPractice(void);
 		/* GAME MAIN */
 
 void GameMain(void);
+
+extern int   gDirectLaunchLevel;
+extern char  gDirectTerrainPath[512];

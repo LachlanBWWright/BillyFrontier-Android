@@ -5,6 +5,10 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #include "Pomme.h"
 #include "PommeInit.h"
 #include "PommeFiles.h"
@@ -88,6 +92,49 @@ static void Boot(int argc, char** argv)
 	// Load game prefs before starting
 	LoadPrefs();
 
+#ifdef __EMSCRIPTEN__
+	// Parse URL hash parameters for level editor integration.
+	// Supported params: #level=N  and  #terrain=/path/to/file.ter
+	// Example: billyfrontier.html#level=1&terrain=/Data/Terrain/custom.ter
+	char hashBuf[512] = {0};
+	int hashLen = EM_ASM_INT({
+		var h = window.location.hash.replace(/^#/, '');
+		var buf = $0;
+		var len = Math.min(h.length, $1 - 1);
+		for (var i = 0; i < len; i++) {
+			Module.HEAPU8[buf + i] = h.charCodeAt(i);
+		}
+		Module.HEAPU8[buf + len] = 0;
+		return len;
+	}, hashBuf, (int)sizeof(hashBuf));
+
+	if (hashLen > 0)
+	{
+		// Tokenise key=value pairs separated by '&'
+		char *saveptr = nullptr;
+		char *pair = SDL_strtok_r(hashBuf, "&", &saveptr);
+		while (pair)
+		{
+			char *eq = SDL_strchr(pair, '=');
+			if (eq)
+			{
+				*eq = '\0';
+				const char *key = pair;
+				const char *val = eq + 1;
+				if (SDL_strcmp(key, "level") == 0)
+				{
+					gDirectLaunchLevel = SDL_atoi(val);
+				}
+				else if (SDL_strcmp(key, "terrain") == 0)
+				{
+					SDL_strlcpy(gDirectTerrainPath, val, sizeof(gDirectTerrainPath));
+				}
+			}
+			pair = SDL_strtok_r(nullptr, "&", &saveptr);
+		}
+	}
+#endif
+
 retryVideo:
 	// Initialize SDL video subsystem
 	if (!SDL_Init(SDL_INIT_VIDEO))
@@ -96,9 +143,16 @@ retryVideo:
 	}
 
 	// Create window
+#ifdef __EMSCRIPTEN__
+	// WebGL context (OpenGL ES 2.0 mapped to WebGL)
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#else
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#endif
 
 	gCurrentAntialiasingLevel = gGamePrefs.antialiasingLevel;
 	if (gCurrentAntialiasingLevel != 0)

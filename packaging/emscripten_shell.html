@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Billy Frontier</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #1a1a1a;
+      color: #eee;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    header {
+      width: 100%;
+      background: #111;
+      padding: 8px 16px;
+      text-align: center;
+      font-size: 1.1em;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      border-bottom: 2px solid #c0922a;
+    }
+    #canvas-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex: 1;
+      padding: 16px;
+    }
+    canvas.emscripten {
+      border: 0;
+      background: black;
+      max-width: 100%;
+      max-height: 80vh;
+      display: block;
+    }
+    #status {
+      color: #aaa;
+      padding: 8px;
+      text-align: center;
+      font-size: 0.9em;
+    }
+    #progress {
+      width: 320px;
+      height: 8px;
+      background: #333;
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 8px auto;
+    }
+    #progress-bar {
+      height: 100%;
+      width: 0%;
+      background: #c0922a;
+      transition: width 0.2s;
+    }
+    #output { display: none; }
+    #controls {
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin: 8px 0 16px 0;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      font-size: 0.85em;
+    }
+    #controls label { color: #ccc; }
+    #controls select, #controls button, #controls input[type=file] {
+      background: #333;
+      color: #eee;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+    #controls button:hover { background: #444; }
+  </style>
+</head>
+<body>
+  <header>Billy Frontier &mdash; WebAssembly</header>
+
+  <div id="canvas-container">
+    <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+  </div>
+
+  <!-- Level Editor Controls -->
+  <div id="controls">
+    <label for="level-select">Level:</label>
+    <select id="level-select">
+      <option value="-1">Normal startup</option>
+      <option value="0">Town Duel 1</option>
+      <option value="1">Town Shootout</option>
+      <option value="2">Town Duel 2</option>
+      <option value="3">Town Stampede</option>
+      <option value="4">Town Duel 3</option>
+      <option value="5">Target Practice 1</option>
+      <option value="6">Swamp Duel 1</option>
+      <option value="7">Swamp Shootout</option>
+      <option value="8">Swamp Duel 2</option>
+      <option value="9">Swamp Stampede</option>
+      <option value="10">Swamp Duel 3</option>
+      <option value="11">Target Practice 2</option>
+    </select>
+
+    <button id="btn-set-level">Set Level &amp; Restart</button>
+
+    <label>
+      <input type="checkbox" id="chk-fence"> Fence Collision
+    </label>
+
+    <label for="terrain-file">Override Terrain:</label>
+    <input type="file" id="terrain-file" accept=".ter">
+  </div>
+
+  <div id="status">Downloading...</div>
+  <div id="progress"><div id="progress-bar"></div></div>
+  <textarea id="output" rows="8"></textarea>
+
+  {{{ SCRIPT }}}
+
+  <script>
+    var Module = {
+      canvas: (function() { return document.getElementById('canvas'); })(),
+      print: function(text) { console.log(text); },
+      printErr: function(text) { console.error(text); },
+      setStatus: function(text) {
+        var el = document.getElementById('status');
+        var bar = document.getElementById('progress-bar');
+        if (!el) return;
+        if (text) {
+          var match = text.match(/(\d+(\.\d+)?)\/(\d+)/);
+          if (match) {
+            bar.style.width = (100 * parseInt(match[1]) / parseInt(match[3])) + '%';
+          }
+          el.textContent = text;
+        } else {
+          el.textContent = '';
+          document.getElementById('progress').style.display = 'none';
+        }
+      },
+      monitorRunDependencies: function(left) {
+        if (left === 0) Module.setStatus('');
+      }
+    };
+    window.onerror = function(event) {
+      Module.setStatus('Exception thrown: ' + event.message);
+    };
+
+    // -----------------------------------------------------------------------
+    // Level Editor Controls
+    // -----------------------------------------------------------------------
+
+    document.getElementById('btn-set-level').addEventListener('click', function() {
+      var level = parseInt(document.getElementById('level-select').value, 10);
+      if (typeof Module.ccall === 'function') {
+        Module.ccall('BF_SetDirectLaunchLevel', null, ['number'], [level]);
+        alert('Level set to ' + level + '. Reload the page (or restart) to apply.');
+      } else {
+        // Set via URL hash so it's applied on next load
+        var url = window.location.pathname + '#level=' + level;
+        window.location.href = url;
+      }
+    });
+
+    document.getElementById('chk-fence').addEventListener('change', function() {
+      if (typeof Module.ccall === 'function') {
+        Module.ccall('BF_SetFenceCollision', null, ['number'], [this.checked ? 1 : 0]);
+      }
+    });
+
+    // Sync checkbox state after Module is ready
+    window.addEventListener('load', function() {
+      var checkInterval = setInterval(function() {
+        if (typeof Module.ccall === 'function') {
+          var enabled = Module.ccall('BF_GetFenceCollision', 'number', [], []);
+          document.getElementById('chk-fence').checked = (enabled === 1);
+          clearInterval(checkInterval);
+        }
+      }, 500);
+    });
+
+    // Upload a custom terrain .ter file into the Emscripten virtual filesystem
+    document.getElementById('terrain-file').addEventListener('change', function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        var data = new Uint8Array(ev.target.result);
+        if (typeof Module.ccall === 'function' && Module.FS) {
+          // Write file to /tmp/custom_level.ter
+          Module.FS.writeFile('/tmp/custom_level.ter', data);
+          Module.ccall('BF_SetTerrainFile', null, ['string'], ['/tmp/custom_level.ter']);
+          alert('Terrain file "' + file.name + '" loaded. It will be used on the next level load.');
+        } else {
+          alert('Game not ready yet. Please wait until it has fully loaded.');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    // Apply level from URL hash on page load
+    (function() {
+      var hash = window.location.hash.replace(/^#/, '');
+      hash.split('&').forEach(function(pair) {
+        var eq = pair.indexOf('=');
+        if (eq < 0) return;
+        var key = pair.slice(0, eq);
+        var val = pair.slice(eq + 1);
+        if (key === 'level') {
+          document.getElementById('level-select').value = val;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

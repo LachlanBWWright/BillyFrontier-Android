@@ -1,6 +1,9 @@
 name: Make Release Builds
 
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
 
 jobs:
   build-linux-appimage:
@@ -86,3 +89,139 @@ jobs:
           name: ${{env.ARTIFACT_NAME}}
           path: dist/
           compression-level: 0
+
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: {submodules: 'recursive'}
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Install Android SDK build tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y cmake ninja-build
+      - name: Set artifact name
+        run: echo "ARTIFACT_NAME=BillyFrontier-${{ github.ref_name }}-android.apk" >> $GITHUB_ENV
+      - name: Build Android APK via SDL Android template
+        run: |
+          # SDL3 ships an Android project template.
+          # Clone it, copy our source in, and build.
+          SDL_SRC="${{ github.workspace }}/extern/SDL"
+          ANDROID_PROJ="${{ github.workspace }}/build-android"
+          cp -r "$SDL_SRC/android-project" "$ANDROID_PROJ"
+          # Copy game source into the Android project
+          cp -r "${{ github.workspace }}/Source" "$ANDROID_PROJ/app/jni/src"
+          cp -r "${{ github.workspace }}/extern/Pomme" "$ANDROID_PROJ/app/jni/Pomme"
+          cp "${{ github.workspace }}/CMakeLists.txt" "$ANDROID_PROJ/app/jni/CMakeLists.txt" || true
+          # Build the APK
+          cd "$ANDROID_PROJ"
+          ./gradlew assembleRelease --no-daemon || ./gradlew assembleDebug --no-daemon
+          find . -name "*.apk" -exec cp {} "${{ github.workspace }}/dist/${{ env.ARTIFACT_NAME }}" \;
+        continue-on-error: true  # Android build is best-effort until a full Gradle project is configured
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: ${{env.ARTIFACT_NAME}}
+          path: dist/
+          compression-level: 0
+
+  build-wasm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with: {submodules: 'recursive'}
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '3.1.69'
+          actions-cache-folder: 'emsdk-cache'
+      - name: Verify emcc
+        run: emcc --version
+      - name: Set artifact name
+        run: echo "ARTIFACT_NAME=$(python3 build.py --print-artifact-name --emscripten)" >> $GITHUB_ENV
+      - name: Build WebAssembly
+        run: python3 build.py --emscripten --dependencies --configure --build --package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{env.ARTIFACT_NAME}}
+          path: dist/
+          compression-level: 0
+      - name: Prepare GitHub Pages deployment
+        run: |
+          mkdir -p docs/game
+          unzip -o dist/${{ env.ARTIFACT_NAME }} -d /tmp/wasm-out
+          cp -r /tmp/wasm-out/*/* docs/game/ 2>/dev/null || cp -r /tmp/wasm-out/* docs/game/ 2>/dev/null || true
+      - name: Upload Pages artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages-content
+          path: docs/
+          compression-level: 0
+
+  release:
+    needs: [build-linux-appimage, build-windows, build-macos, build-wasm]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+          pattern: 'BillyFrontier-*'
+          merge-multiple: true
+      - name: Create or update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ github.run_number }}-latest"
+          name: "Billy Frontier – Latest Build"
+          body: |
+            Automated release from push to ${{ github.ref_name }} (commit ${{ github.sha }}).
+
+            ## Downloads
+            - **Windows**: `BillyFrontier-*-windows-x64.zip`
+            - **macOS**: `BillyFrontier-*-mac.dmg`
+            - **Linux x86_64**: `BillyFrontier-*-linux-x86_64.AppImage`
+            - **Linux aarch64**: `BillyFrontier-*-linux-aarch64.AppImage`
+            - **WebAssembly**: `BillyFrontier-*-wasm.zip`
+
+            Play in browser: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          files: all-artifacts/*
+          prerelease: false
+          draft: false
+
+  deploy-pages:
+    needs: [build-wasm]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download wasm pages content
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages-content
+          path: docs-deploy
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-deploy
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+

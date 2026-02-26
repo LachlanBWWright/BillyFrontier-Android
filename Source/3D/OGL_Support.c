@@ -14,6 +14,10 @@
 #include "stb_image.h"
 #include "ogl_functions.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -685,6 +689,10 @@ do_anaglyph:
            /* SWAP THE BUFFS */
 
 	SDL_GL_SwapWindow(gSDLWindow);					// end render loop
+
+#ifdef __EMSCRIPTEN__
+	emscripten_sleep(0);							// yield to browser (required for ASYNCIFY)
+#endif
 
 
 	if (gGamePrefs.anaglyph)

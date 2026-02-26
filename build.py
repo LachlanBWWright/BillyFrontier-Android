@@ -107,6 +107,9 @@ parser.add_argument("--dist-dir", metavar="<dir>", default=dist_dir,
 parser.add_argument("--print-artifact-name", default=False, action="store_true",
         help="print artifact name and exit")
 
+parser.add_argument("--emscripten", default=False, action="store_true",
+        help="build WebAssembly target using Emscripten")
+
 if SYSTEM == "Linux":
     parser.add_argument("--system-sdl", default=False, action="store_true",
         help="use system SDL instead of building SDL from scratch")
@@ -438,6 +441,52 @@ class LinuxProject(Project):
             rm_if_exists(self.get_artifact_path())
             call([appimagetool_path, appdir, self.get_artifact_path()])
 
+class EmscriptenProject(Project):
+    def __init__(self, dir_name="build-wasm"):
+        super().__init__(dir_name)
+        self.gen_args += ["-DCMAKE_BUILD_TYPE=Release"]
+        self.build_args += ["-j", str(NPROC)]
+        self.build_configs = ["Release"]
+
+    def get_artifact_name(self):
+        return f"{game_name}-{game_ver}-wasm.zip"
+
+    def prepare_dependencies(self):
+        # Emscripten builds SDL3 from source; ensure the SDL submodule is present
+        sdl_src = f"{libs_dir}/SDL"
+        if not os.path.exists(f"{sdl_src}/CMakeLists.txt"):
+            die(f"SDL source not found at {sdl_src}.\n"
+                "Run: git submodule update --init --recursive")
+
+    def configure(self):
+        fatlog(f"Configuring {self.dir_name} (Emscripten)")
+
+        if os.path.exists(self.dir_name):
+            if not os.path.exists(self.dir_name + "/CMakeCache.txt"):
+                die(f"Path exists and isn't an old build directory: {self.dir_name}")
+            shutil.rmtree(self.dir_name)
+
+        call(["emcmake", "cmake", "-S", ".", "-B", self.dir_name] + self.gen_args)
+
+    def build(self):
+        call(["cmake", "--build", self.dir_name, "-j", str(NPROC)])
+
+    def package(self):
+        build_out = self.dir_name
+
+        appdir = f"{cache_dir}/{game_name}-{game_ver}-wasm"
+        rmtree_if_exists(appdir)
+        os.makedirs(appdir, exist_ok=True)
+
+        # Copy all generated WebAssembly artefacts
+        for pattern in ["*.html", "*.js", "*.wasm", "*.data"]:
+            for f in glob.glob(f"{build_out}/{pattern}"):
+                shutil.copy(f, appdir)
+
+        rm_if_exists(self.get_artifact_path())
+        zipdir(self.get_artifact_path(), appdir, f"{game_name}-{game_ver}-wasm")
+
+
 #----------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -447,7 +496,10 @@ if __name__ == "__main__":
     #----------------------------------------------------------------
     # Set up project metadata
 
-    if SYSTEM == "Windows":
+    if args.emscripten:
+        project = EmscriptenProject(build_dir)
+
+    elif SYSTEM == "Windows":
         project = WindowsProject(build_dir)
 
     elif SYSTEM == "Darwin":
