@@ -65,6 +65,9 @@ uint32_t			gScore,gLoadedScore;
 Byte				gDuelWonMask;
 Byte				gLevelWonMask;
 
+int					gDirectLaunchLevel = -1;	// -1 = normal startup, >=0 = jump straight to area
+char				gDirectTerrainPath[512] = {0};	// optional override terrain file path
+
 
 //======================================================================================
 //======================================================================================
@@ -367,6 +370,51 @@ unsigned long	someLong;
 	LoadSpriteGroup(SPRITE_GROUP_SPHEREMAPS);
 	LoadSpriteGroup(SPRITE_GROUP_INFOBAR);
 
+
+		/* DIRECT LEVEL LAUNCH (e.g. from level editor via WebAssembly) */
+
+	if (gDirectLaunchLevel >= 0)
+	{
+		InitPlayerInfo_Game();
+		gCurrentArea = gDirectLaunchLevel;
+
+		switch(gCurrentArea)
+		{
+			case AREA_TOWN_DUEL1:
+			case AREA_TOWN_DUEL2:
+			case AREA_TOWN_DUEL3:
+			case AREA_SWAMP_DUEL1:
+			case AREA_SWAMP_DUEL2:
+			case AREA_SWAMP_DUEL3:
+				// PlayDuel takes a difficulty index equal to half the area number.
+				// Duel areas are defined at even offsets (0, 2, 4, 6, 8, 10) in the
+				// area enum, so dividing by 2 gives the difficulty/duel index.
+				PlayDuel(gCurrentArea / 2);
+				break;
+
+			case AREA_TOWN_SHOOTOUT:
+			case AREA_SWAMP_SHOOTOUT:
+				PlayShootout();
+				break;
+
+			case AREA_TOWN_STAMPEDE:
+			case AREA_SWAMP_STAMPEDE:
+				PlayStampede();
+				break;
+
+			case AREA_TARGETPRACTICE1:
+			case AREA_TARGETPRACTICE2:
+				PlayTargetPractice();
+				break;
+
+			default:
+				break;
+		}
+
+		return;
+	}
+
+
 		/* SHOW TITLES */
 
 	PlaySong(SONG_THEME, true);
@@ -376,13 +424,13 @@ unsigned long	someLong;
 //gScore = 12345; NewScore(false);	//----------
 
 		/* MAIN LOOP */
-			
+		
 	while(true)
 	{		
 		MyFlushEvents();
 
 		DoMainMenuScreen(0);
-						
+					
 		PlayGame_Arcade();
 	}
 	

@@ -24,7 +24,7 @@ option(SDL_STATIC "Static link SDL" OFF)
 
 option(SANITIZE "Build with asan/ubsan" OFF)
 
-if(WIN32 OR APPLE)
+if(WIN32 OR APPLE OR EMSCRIPTEN)
 	# Don't warn
 elseif(SANITIZE)
 	message("Sanitizers enabled")
@@ -60,32 +60,41 @@ add_compile_definitions(POMME_CASE_SENSITIVE_FSSPEC=1)
 # FIND SDL
 #------------------------------------------------------------------------------
 
-# If SDL3_DIR wasn't specified, discover if the user put some prebuilt SDL3
-# package in the 'extern' directory
-if(NOT DEFINED SDL3_DIR)
-	if(APPLE)
-		set(_sdl3_maybe "${CMAKE_SOURCE_DIR}/extern/SDL3.framework/Resources/CMake")
-	elseif(WIN32)
-		set(_sdl3_maybe "${CMAKE_SOURCE_DIR}/extern/SDL3/cmake")
+if(NOT EMSCRIPTEN)
+	# If SDL3_DIR wasn't specified, discover if the user put some prebuilt SDL3
+	# package in the 'extern' directory
+	if(NOT DEFINED SDL3_DIR)
+		if(APPLE)
+			set(_sdl3_maybe "${CMAKE_SOURCE_DIR}/extern/SDL3.framework/Resources/CMake")
+		elseif(WIN32)
+			set(_sdl3_maybe "${CMAKE_SOURCE_DIR}/extern/SDL3/cmake")
+		endif()
+
+		if(DEFINED _sdl3_maybe AND EXISTS "${_sdl3_maybe}")
+			set(SDL3_DIR "${_sdl3_maybe}")
+			message("Looking for SDL3 in: ${_sdl3_maybe}")
+		else()
+			message("Couldn't find pre-built SDL3 package in: ${_sdl3_maybe}")
+		endif()
+		unset(_sdl3_maybe)
 	endif()
 
-	if(DEFINED _sdl3_maybe AND EXISTS "${_sdl3_maybe}")
-		set(SDL3_DIR "${_sdl3_maybe}")
-		message("Looking for SDL3 in: ${_sdl3_maybe}")
+	if(NOT BUILD_SDL_FROM_SOURCE)
+		find_package(SDL3 CONFIG REQUIRED)
+		message("Found pre-built SDL3")
 	else()
-		message("Couldn't find pre-built SDL3 package in: ${_sdl3_maybe}")
+		if(NOT DEFINED SDL3_DIR)
+			set(SDL3_DIR "${CMAKE_SOURCE_DIR}/extern/SDL")
+		endif()
+		message("Building SDL3 from source: " ${SDL3_DIR})
+		add_subdirectory("${SDL3_DIR}" EXCLUDE_FROM_ALL)
 	endif()
-	unset(_sdl3_maybe)
-endif()
-
-if(NOT BUILD_SDL_FROM_SOURCE)
-	find_package(SDL3 CONFIG REQUIRED)
-	message("Found pre-built SDL3")
 else()
+	# Emscripten: build SDL3 from source (required for Emscripten port)
 	if(NOT DEFINED SDL3_DIR)
 		set(SDL3_DIR "${CMAKE_SOURCE_DIR}/extern/SDL")
 	endif()
-	message("Building SDL3 from source: " ${SDL3_DIR})
+	message("Emscripten: Building SDL3 from source: " ${SDL3_DIR})
 	add_subdirectory("${SDL3_DIR}" EXCLUDE_FROM_ALL)
 endif()
 
@@ -95,7 +104,9 @@ endif()
 
 add_subdirectory(extern/Pomme)
 
-find_package(OpenGL REQUIRED)
+if(NOT EMSCRIPTEN)
+	find_package(OpenGL REQUIRED)
+endif()
 
 #------------------------------------------------------------------------------
 # EXECUTABLE TARGET
@@ -197,19 +208,27 @@ if(SANITIZE)
 endif()
 
 # Explicitly link math lib on Linux
-if(NOT APPLE AND NOT WIN32)
+if(NOT APPLE AND NOT WIN32 AND NOT EMSCRIPTEN)
 	target_link_libraries(${GAME_TARGET} PRIVATE m)
 endif()
 
 # Link SDL
-if(NOT SDL_STATIC)
-	target_link_libraries(${GAME_TARGET} PRIVATE SDL3::SDL3)
+if(NOT EMSCRIPTEN)
+	if(NOT SDL_STATIC)
+		target_link_libraries(${GAME_TARGET} PRIVATE SDL3::SDL3)
+	else()
+		target_link_libraries(${GAME_TARGET} PRIVATE SDL3::SDL3-static)
+	endif()
 else()
 	target_link_libraries(${GAME_TARGET} PRIVATE SDL3::SDL3-static)
 endif()
 
 # Link core dependencies
-target_link_libraries(${GAME_TARGET} PRIVATE Pomme OpenGL::GL)
+if(NOT EMSCRIPTEN)
+	target_link_libraries(${GAME_TARGET} PRIVATE Pomme OpenGL::GL)
+else()
+	target_link_libraries(${GAME_TARGET} PRIVATE Pomme)
+endif()
 
 # Add required frameworks for KillMacMouseAcceleration
 if(APPLE)
@@ -220,57 +239,59 @@ endif()
 # PLATFORM-SPECIFIC PROPERTIES
 #------------------------------------------------------------------------------
 
-set_target_properties(${GAME_TARGET} PROPERTIES
-	#--------------------------------------------------------------------------
-	# MSVC/WIN32
-	#--------------------------------------------------------------------------
+if(NOT EMSCRIPTEN)
+	set_target_properties(${GAME_TARGET} PROPERTIES
+		#--------------------------------------------------------------------------
+		# MSVC/WIN32
+		#--------------------------------------------------------------------------
 
-	WIN32_EXECUTABLE					TRUE					# GUI application instead of console application
-	VS_DEBUGGER_WORKING_DIRECTORY		"${CMAKE_SOURCE_DIR}"
-	VS_DPI_AWARE						"PerMonitor"
+		WIN32_EXECUTABLE					TRUE					# GUI application instead of console application
+		VS_DEBUGGER_WORKING_DIRECTORY		"${CMAKE_SOURCE_DIR}"
+		VS_DPI_AWARE						"PerMonitor"
 
-	#--------------------------------------------------------------------------
-	# APPLE
-	#--------------------------------------------------------------------------
+		#--------------------------------------------------------------------------
+		# APPLE
+		#--------------------------------------------------------------------------
 
-	# Build it as an .app bundle
-	MACOSX_BUNDLE						TRUE
+		# Build it as an .app bundle
+		MACOSX_BUNDLE						TRUE
 
-	# Set framework search path to (App bundle)/Contents/Frameworks so the game can use its embedded SDL3.framework
-	XCODE_ATTRIBUTE_LD_RUNPATH_SEARCH_PATHS "@executable_path/../Frameworks"
+		# Set framework search path to (App bundle)/Contents/Frameworks so the game can use its embedded SDL3.framework
+		XCODE_ATTRIBUTE_LD_RUNPATH_SEARCH_PATHS "@executable_path/../Frameworks"
 
-	# Explicitly turn off code signing, otherwise downloaded app will be quarantined forever
-	XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
+		# Explicitly turn off code signing, otherwise downloaded app will be quarantined forever
+		XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
 
-	# Set up Info.plist values
-	MACOSX_BUNDLE_ICON_FILE				"${GAME_TARGET}.icns"	# CFBundleIconFile
-	MACOSX_BUNDLE_EXECUTABLE_NAME		${GAME_TARGET}			# CFBundleExecutable - executable name inside the bundle
-	MACOSX_BUNDLE_SHORT_VERSION_STRING	${GAME_VERSION}			# CFBundleShortVersionString
-	MACOSX_BUNDLE_COPYRIGHT				${GAME_COPYRIGHT}		# NSHumanReadableCopyright (supersedes CFBundleGetInfoString (MACOSX_BUNDLE_INFO_STRING))
-	MACOSX_BUNDLE_BUNDLE_NAME			${GAME_FULL_NAME}		# CFBundleName - user-visible short name for the bundle, up to 15 characters
-	MACOSX_BUNDLE_GUI_IDENTIFIER		${GAME_IDENTIFIER}		# CFBundleIdentifier - unique bundle ID in reverse-DNS format
+		# Set up Info.plist values
+		MACOSX_BUNDLE_ICON_FILE				"${GAME_TARGET}.icns"	# CFBundleIconFile
+		MACOSX_BUNDLE_EXECUTABLE_NAME		${GAME_TARGET}			# CFBundleExecutable - executable name inside the bundle
+		MACOSX_BUNDLE_SHORT_VERSION_STRING	${GAME_VERSION}			# CFBundleShortVersionString
+		MACOSX_BUNDLE_COPYRIGHT				${GAME_COPYRIGHT}		# NSHumanReadableCopyright (supersedes CFBundleGetInfoString (MACOSX_BUNDLE_INFO_STRING))
+		MACOSX_BUNDLE_BUNDLE_NAME			${GAME_FULL_NAME}		# CFBundleName - user-visible short name for the bundle, up to 15 characters
+		MACOSX_BUNDLE_GUI_IDENTIFIER		${GAME_IDENTIFIER}		# CFBundleIdentifier - unique bundle ID in reverse-DNS format
 
-	# If CODE_SIGN_IDENTITY is NOT empty: tell Xcode to codesign the app properly
-	# Otherwise, if it's empty: explicitly turn off code signing, otherwise downloaded app will be quarantined forever
-	XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "${CODE_SIGN_IDENTITY}"
-	XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY[variant=Debug] ""		# don't bother signing debug build
+		# If CODE_SIGN_IDENTITY is NOT empty: tell Xcode to codesign the app properly
+		# Otherwise, if it's empty: explicitly turn off code signing, otherwise downloaded app will be quarantined forever
+		XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "${CODE_SIGN_IDENTITY}"
+		XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY[variant=Debug] ""		# don't bother signing debug build
 
-	# Bundle ID required for code signing - must match CFBundleIdentifier otherwise xcode will complain
-	XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${GAME_IDENTIFIER}
+		# Bundle ID required for code signing - must match CFBundleIdentifier otherwise xcode will complain
+		XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${GAME_IDENTIFIER}
 
-	# Don't bother with universal builds when we're working on the debug version
-	XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH[variant=Debug] "YES"
+		# Don't bother with universal builds when we're working on the debug version
+		XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH[variant=Debug] "YES"
 
-	XCODE_EMBED_FRAMEWORKS							"extern/SDL3.framework"
-	XCODE_EMBED_FRAMEWORKS_CODE_SIGN_ON_COPY		"YES"		# frameworks must be signed by the same developer as the binary
-	XCODE_EMBED_FRAMEWORKS_REMOVE_HEADERS_ON_COPY	"YES"		# not strictly necessary, but that's cleaner
-	XCODE_ATTRIBUTE_COPY_PHASE_STRIP[variant=Debug]	"NO"		# avoid "skipping copy phase strip" warning while working on Debug config
+		XCODE_EMBED_FRAMEWORKS							"extern/SDL3.framework"
+		XCODE_EMBED_FRAMEWORKS_CODE_SIGN_ON_COPY		"YES"		# frameworks must be signed by the same developer as the binary
+		XCODE_EMBED_FRAMEWORKS_REMOVE_HEADERS_ON_COPY	"YES"		# not strictly necessary, but that's cleaner
+		XCODE_ATTRIBUTE_COPY_PHASE_STRIP[variant=Debug]	"NO"		# avoid "skipping copy phase strip" warning while working on Debug config
 
-	# The following is to pass notarization requirements
-	XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME			"YES"
-	XCODE_ATTRIBUTE_CODE_SIGN_INJECT_BASE_ENTITLEMENTS "NO"
-	XCODE_ATTRIBUTE_OTHER_CODE_SIGN_FLAGS			"--options=runtime --timestamp"
-)
+		# The following is to pass notarization requirements
+		XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME			"YES"
+		XCODE_ATTRIBUTE_CODE_SIGN_INJECT_BASE_ENTITLEMENTS "NO"
+		XCODE_ATTRIBUTE_OTHER_CODE_SIGN_FLAGS			"--options=runtime --timestamp"
+	)
+endif()
 
 #------------------------------------------------------------------------------
 # POST-BUILD (COPY ASSETS, ETC.)
@@ -278,12 +299,14 @@ set_target_properties(${GAME_TARGET} PROPERTIES
 
 if(APPLE)
 	set(GAME_DATA_TARGET_LOCATION "$<TARGET_FILE_DIR:${GAME_TARGET}>/../Resources")
-else()
+elseif(NOT EMSCRIPTEN)
 	set(GAME_DATA_TARGET_LOCATION "$<TARGET_FILE_DIR:${GAME_TARGET}>/Data")
 endif()
 
-add_custom_command(TARGET ${GAME_TARGET} POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_directory "${GAME_DATADIR}" "${GAME_DATA_TARGET_LOCATION}")
+if(NOT EMSCRIPTEN)
+	add_custom_command(TARGET ${GAME_TARGET} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_directory "${GAME_DATADIR}" "${GAME_DATA_TARGET_LOCATION}")
+endif()
 
 if(APPLE)
 	set(INFO_PLIST "${GAME_DATA_TARGET_LOCATION}/../Info.plist")
@@ -311,4 +334,55 @@ if(WIN32)
 endif()
 
 # Copy documentation to output folder
-configure_file(${CMAKE_SOURCE_DIR}/packaging/ReadMe.txt.in ${CMAKE_CURRENT_BINARY_DIR}/ReadMe.txt)
+if(NOT EMSCRIPTEN)
+	configure_file(${CMAKE_SOURCE_DIR}/packaging/ReadMe.txt.in ${CMAKE_CURRENT_BINARY_DIR}/ReadMe.txt)
+endif()
+
+#------------------------------------------------------------------------------
+# EMSCRIPTEN-SPECIFIC CONFIGURATION
+#------------------------------------------------------------------------------
+
+if(EMSCRIPTEN)
+	set_target_properties(${GAME_TARGET} PROPERTIES
+		SUFFIX ".html"
+		OUTPUT_NAME "billyfrontier"
+	)
+
+	# Emscripten link flags for the WebAssembly build
+	target_link_options(${GAME_TARGET} PRIVATE
+		# Asyncify: allows the blocking game-loop architecture to work in the browser.
+		# emscripten_sleep(0) is called after each frame (in OGL_DrawScene) to yield
+		# control back to the browser event loop.
+		-sASYNCIFY=1
+
+		# Legacy OpenGL emulation: translates the game's fixed-function OpenGL pipeline
+		# (glBegin/glEnd, glLight, glFog, glMatrix, etc.) into WebGL draw calls.
+		-sLEGACY_GL_EMULATION=1
+
+		# Memory configuration
+		-sINITIAL_MEMORY=134217728		# 128 MB initial heap
+		-sALLOW_MEMORY_GROWTH=1
+
+		# WebGL 2 for better compatibility
+		-sMAX_WEBGL_VERSION=2
+		-sMIN_WEBGL_VERSION=1
+
+		# Export functions callable from JavaScript
+		-sEXPORTED_FUNCTIONS=_main,_BF_SetFenceCollision,_BF_GetFenceCollision,_BF_SetDirectLaunchLevel,_BF_SetTerrainFile,_BF_LoadTerrainData
+		-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,FS,HEAPU8
+
+		# Bundle all game data into the .data file loaded by the HTML page
+		"--preload-file=${GAME_DATADIR}@Data"
+
+		# Use the SDL-provided shell template for the output HTML
+		--shell-file=${CMAKE_SOURCE_DIR}/packaging/emscripten_shell.html
+
+		# Emscripten exceptions (needed for Pomme::QuitRequest and std::exception)
+		-fexceptions
+		-sDISABLE_EXCEPTION_CATCHING=0
+	)
+
+	target_compile_options(${GAME_TARGET} PRIVATE
+		-fexceptions
+	)
+endif()

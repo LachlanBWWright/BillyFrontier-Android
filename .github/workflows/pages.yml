@@ -1,0 +1,75 @@
+name: Deploy to GitHub Pages
+
+on:
+  # Triggered by the release builds workflow when the wasm build completes
+  workflow_run:
+    workflows: ["Make Release Builds"]
+    types: [completed]
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+permissions:
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download wasm pages content from release workflow
+        uses: actions/download-artifact@v4.1.3
+        with:
+          name: github-pages-content
+          run-id: ${{ github.event.workflow_run.id || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: docs-deploy
+        continue-on-error: true
+
+      # Fallback: if the release workflow artifact isn't available (e.g. manual trigger),
+      # build the wasm bundle on the fly.
+      - name: Install Emscripten (fallback build)
+        if: ${{ hashFiles('docs-deploy/index.html') == '' }}
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '3.1.69'
+          actions-cache-folder: 'emsdk-cache'
+
+      - name: Fallback WebAssembly build
+        if: ${{ hashFiles('docs-deploy/index.html') == '' }}
+        run: |
+          git submodule update --init --recursive
+          python3 build.py --emscripten --dependencies --configure --build --package
+          mkdir -p docs-deploy/game
+          ARTIFACT=$(python3 build.py --print-artifact-name --emscripten)
+          unzip -o "dist/$ARTIFACT" -d /tmp/wasm-out
+          cp -r /tmp/wasm-out/*/* docs-deploy/game/ 2>/dev/null || cp -r /tmp/wasm-out/* docs-deploy/game/ 2>/dev/null || true
+          cp -r docs/. docs-deploy/
+
+      - name: Copy static docs if game folder is missing
+        run: |
+          if [ ! -f docs-deploy/index.html ]; then
+            cp -r docs/. docs-deploy/
+          fi
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-deploy
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
