@@ -5,6 +5,10 @@ on:
   push:
     branches: [main, master]
 
+# Default permissions for all jobs (least privilege)
+permissions:
+  contents: read
+
 jobs:
   build-linux-appimage:
     runs-on: ${{ matrix.platform.os }}
