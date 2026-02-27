@@ -42,6 +42,9 @@ static void MakeTerrainSpec(FSSpec *spec, const char *defaultRelPath)
 		OSErr err = FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, gDirectTerrainPath, spec);
 		if (err == noErr)
 			return;
+		SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+					"MakeTerrainSpec: custom terrain '%s' not found (err=%d), using default '%s'",
+					gDirectTerrainPath, (int)err, defaultRelPath);
 	}
 
 	FSMakeFSSpec(gDataSpec.vRefNum, gDataSpec.parID, defaultRelPath, spec);

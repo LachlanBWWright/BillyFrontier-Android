@@ -106,7 +106,7 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y cmake ninja-build
       - name: Set artifact name
-        run: echo "ARTIFACT_NAME=BillyFrontier-${{ github.ref_name }}-android.apk" >> $GITHUB_ENV
+        run: echo "ARTIFACT_NAME=BillyFrontier-1.1.2-android.apk" >> $GITHUB_ENV
       - name: Build Android APK via SDL Android template
         run: |
           # SDL3 ships an Android project template.

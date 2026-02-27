@@ -354,7 +354,6 @@ if(EMSCRIPTEN)
 		# emscripten_sleep(0) is called after each frame (in OGL_DrawScene) to yield
 		# control back to the browser event loop.
 		-sASYNCIFY=1
-		-sASYNCIFY_IMPORTS=emscripten_sleep
 
 		# Legacy OpenGL emulation: translates the game's fixed-function OpenGL pipeline
 		# (glBegin/glEnd, glLight, glFog, glMatrix, etc.) into WebGL draw calls.

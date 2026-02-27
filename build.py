@@ -478,7 +478,7 @@ class EmscriptenProject(Project):
         rmtree_if_exists(appdir)
         os.makedirs(appdir, exist_ok=True)
 
-        # Copy all generated WebAssembly artefacts
+        # Copy all generated WebAssembly artifacts
         for pattern in ["*.html", "*.js", "*.wasm", "*.data"]:
             for f in glob.glob(f"{build_out}/{pattern}"):
                 shutil.copy(f, appdir)

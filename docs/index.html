@@ -158,7 +158,7 @@
         <li><code>Module.ccall('BF_SetDirectLaunchLevel', null, ['number'], [area])</code> – skip to area</li>
         <li><code>Module.ccall('BF_SetFenceCollision', null, ['number'], [1])</code> – enable fence collisions</li>
         <li><code>Module.ccall('BF_SetFenceCollision', null, ['number'], [0])</code> – disable fence collisions</li>
-        <li><code>Module.ccall('BF_SetTerrainFile', null, ['string'], ['/tmp/custom.ter'])</code> – set terrain override path</li>
+        <li><code>Module.FS.writeFile('Data/Terrain/custom.ter', data)</code> then <code>Module.ccall('BF_SetTerrainFile', null, ['string'], [':Terrain:custom.ter'])</code> – upload and activate a custom terrain file</li>
       </ul>
     </section>
 

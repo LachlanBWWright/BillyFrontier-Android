@@ -162,14 +162,18 @@
 
     document.getElementById('btn-set-level').addEventListener('click', function() {
       var level = parseInt(document.getElementById('level-select').value, 10);
-      if (typeof Module.ccall === 'function') {
-        Module.ccall('BF_SetDirectLaunchLevel', null, ['number'], [level]);
-        alert('Level set to ' + level + '. Reload the page (or restart) to apply.');
-      } else {
-        // Set via URL hash so it's applied on next load
-        var url = window.location.pathname + '#level=' + level;
-        window.location.href = url;
-      }
+      // Reload the page with the chosen level encoded in the URL hash.
+      // This is the most reliable way to apply the level selection, since
+      // the level is parsed during startup (before the game initialises).
+      var hash = 'level=' + level;
+      var currentHash = window.location.hash.replace(/^#/, '');
+      // Preserve other hash params (e.g. terrain=)
+      var parts = currentHash.split('&').filter(function(p) {
+        return p && !p.startsWith('level=');
+      });
+      parts.unshift(hash);
+      window.location.hash = parts.join('&');
+      window.location.reload();
     });
 
     document.getElementById('chk-fence').addEventListener('change', function() {
@@ -197,9 +201,11 @@
       reader.onload = function(ev) {
         var data = new Uint8Array(ev.target.result);
         if (typeof Module.ccall === 'function' && Module.FS) {
-          // Write file to /tmp/custom_level.ter
-          Module.FS.writeFile('/tmp/custom_level.ter', data);
-          Module.ccall('BF_SetTerrainFile', null, ['string'], ['/tmp/custom_level.ter']);
+          // Write to Data/Terrain/ so it sits alongside the bundled terrain files.
+          // The Pomme colon-path ':Terrain:custom_level.ter' is relative to Data/System,
+          // navigating up one directory then into Terrain/.
+          Module.FS.writeFile('Data/Terrain/custom_level.ter', data);
+          Module.ccall('BF_SetTerrainFile', null, ['string'], [':Terrain:custom_level.ter']);
           alert('Terrain file "' + file.name + '" loaded. It will be used on the next level load.');
         } else {
           alert('Game not ready yet. Please wait until it has fully loaded.');

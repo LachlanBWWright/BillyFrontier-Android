@@ -386,6 +386,9 @@ unsigned long	someLong;
 			case AREA_SWAMP_DUEL1:
 			case AREA_SWAMP_DUEL2:
 			case AREA_SWAMP_DUEL3:
+				// PlayDuel takes a difficulty index equal to half the area number.
+				// Duel areas are defined at even offsets (0, 2, 4, 6, 8, 10) in the
+				// area enum, so dividing by 2 gives the difficulty/duel index.
 				PlayDuel(gCurrentArea / 2);
 				break;
 

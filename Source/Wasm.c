@@ -56,12 +56,15 @@ void BF_SetDirectLaunchLevel(int area)
 
 /**
  * Override the terrain file used for the next level load.
- * Pass a Pomme-style colon-separated path relative to the Data directory,
- * e.g. ":Terrain:town_duel.ter", or an empty string "" to clear the override
- * and use the bundled files.
+ * The path must be a Pomme-style colon-separated path relative to the Data
+ * directory, e.g. ":Terrain:town_duel.ter".  Pass an empty string "" to clear
+ * the override and use the bundled files.
  *
  * Use BF_LoadTerrainData() to upload a custom .ter file into the virtual
- * filesystem, which also sets this override automatically.
+ * filesystem, which automatically sets this override to the correct format.
+ * If you are writing the file manually via Module.FS, write it to
+ * "Data/Terrain/custom_level.ter" and call
+ * BF_SetTerrainFile(":Terrain:custom_level.ter").
  */
 EMSCRIPTEN_KEEPALIVE
 void BF_SetTerrainFile(const char *path)
