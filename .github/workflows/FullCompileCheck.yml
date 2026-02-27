@@ -2,29 +2,22 @@ name: Full Compile Check
 
 on: [workflow_dispatch]
 
+permissions:
+  contents: read
+
 jobs:
-  full-compile-check:
-    name: ${{ matrix.platform.name }}
-    runs-on: ${{ matrix.platform.os }}
-    timeout-minutes: 5
-
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - { name: Linux/GCC, os: ubuntu-latest, extraflags: "--system-sdl" }
-          - { name: Linux/Clang, os: ubuntu-latest, extraflags: "--system-sdl", prefix: "CC=clang CXX=clang++"}
-          - { name: Windows/VS2022, os: windows-2022, extraflags: "-G 'Visual Studio 17 2022'" }
-          - { name: Mac, os: macos-latest }
-
+  build-wasm:
+    name: WebAssembly/Emscripten
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - name: Install Linux build dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt update
-          sudo apt install libsdl3-dev
-
       - uses: actions/checkout@v4
         with: {submodules: 'recursive'}
-          
-      - run: ${{matrix.platform.prefix}} python3 build.py --dependencies --configure --build ${{matrix.platform.extraflags}}
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '3.1.69'
+          actions-cache-folder: 'emsdk-cache'
+      - name: Verify emcc
+        run: emcc --version
+      - run: python3 build.py --emscripten --dependencies --configure --build

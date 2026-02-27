@@ -24,6 +24,12 @@ option(SDL_STATIC "Static link SDL" OFF)
 
 option(SANITIZE "Build with asan/ubsan" OFF)
 
+# Emscripten requires static SDL (no shared libs on WASM)
+if(EMSCRIPTEN)
+	set(SDL_STATIC ON CACHE BOOL "Build SDL as static library" FORCE)
+	set(SDL_SHARED OFF CACHE BOOL "Build SDL as shared library" FORCE)
+endif()
+
 if(WIN32 OR APPLE OR EMSCRIPTEN)
 	# Don't warn
 elseif(SANITIZE)
@@ -95,7 +101,13 @@ else()
 		set(SDL3_DIR "${CMAKE_SOURCE_DIR}/extern/SDL")
 	endif()
 	message("Emscripten: Building SDL3 from source: " ${SDL3_DIR})
-	add_subdirectory("${SDL3_DIR}" EXCLUDE_FROM_ALL)
+	set(_SDL3_BIN_DIR "${CMAKE_BINARY_DIR}/extern/SDL")
+	add_subdirectory("${SDL3_DIR}" "${_SDL3_BIN_DIR}" EXCLUDE_FROM_ALL)
+	# Emscripten sets CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY (sysroot-only search),
+	# so we must add our SDL3 build tree to CMAKE_FIND_ROOT_PATH so that
+	# Pomme's find_package(SDL3) can locate SDL3Config.cmake.
+	list(APPEND CMAKE_FIND_ROOT_PATH "${_SDL3_BIN_DIR}")
+	set(SDL3_DIR "${_SDL3_BIN_DIR}" CACHE PATH "" FORCE)
 endif()
 
 #------------------------------------------------------------------------------
