@@ -371,6 +371,10 @@ if(EMSCRIPTEN)
 		# (glBegin/glEnd, glLight, glFog, glMatrix, etc.) into WebGL draw calls.
 		-sLEGACY_GL_EMULATION=1
 
+		# Disable the aggressive GL emulation optimizations that can cause rendering
+		# artifacts and trigger the "unsafe opts" console warning in the browser.
+		-sGL_UNSAFE_OPTS=0
+
 		# Memory configuration
 		-sINITIAL_MEMORY=134217728		# 128 MB initial heap
 		-sALLOW_MEMORY_GROWTH=1
