@@ -9,3 +9,4 @@ dist/
 .idea/
 .DS_Store
 *.user
+_codeql_detected_source_root
