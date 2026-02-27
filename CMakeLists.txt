@@ -114,12 +114,6 @@ endif()
 # DEPENDENCIES
 #------------------------------------------------------------------------------
 
-# When SDL3 was added via add_subdirectory above, its targets are available
-# in scope. Mark SDL3 as found so Pomme's find_package(SDL3) succeeds.
-if(EMSCRIPTEN)
-	set(SDL3_FOUND TRUE)
-endif()
-
 add_subdirectory(extern/Pomme)
 
 if(NOT EMSCRIPTEN)
