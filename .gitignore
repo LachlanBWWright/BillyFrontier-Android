@@ -1,5 +1,6 @@
 build*/
 cmake-build-*/
+CMakeFiles/
 cache/
 extern/SDL3*
 dist/
