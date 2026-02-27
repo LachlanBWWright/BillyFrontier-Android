@@ -5,7 +5,6 @@ on:
   workflow_run:
     workflows: ["Make Release Builds"]
     types: [completed]
-    branches: [main, master]
 
   # Allow manual trigger
   workflow_dispatch:
