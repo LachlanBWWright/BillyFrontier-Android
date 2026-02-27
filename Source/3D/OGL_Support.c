@@ -743,7 +743,44 @@ GLuint	textureName;
 		else
 			ConvertTextureToGrey(imageMemory, width, height, srcFormat, dataType);
 	}
-				
+
+#ifdef __EMSCRIPTEN__
+		/* WEBGL DOES NOT SUPPORT GL_BGRA OR GL_UNSIGNED_SHORT_1_5_5_5_REV.   */
+		/* Convert packed 16-bit BGRA to interleaved 8-bit RGBA so that WebGL */
+		/* (and Emscripten's LEGACY_GL_EMULATION) can accept the texture.     */
+
+	void *convertedPixels = NULL;
+	if (dataType == GL_UNSIGNED_SHORT_1_5_5_5_REV)
+	{
+		int numPixels = width * height;
+		uint8_t *rgba = (uint8_t *) AllocPtr(numPixels * 4);
+		const uint16_t *sp = (const uint16_t *) imageMemory;
+		for (int pi = 0; pi < numPixels; pi++)
+		{
+			uint16_t px = sp[pi];
+			/* Layout for GL_BGRA + GL_UNSIGNED_SHORT_1_5_5_5_REV:  */
+			/*   bits  4-0  = Blue (5-bit)                           */
+			/*   bits  9-5  = Green (5-bit)                          */
+			/*   bits 14-10 = Red (5-bit)                            */
+			/*   bit    15  = Alpha (1-bit)                          */
+			uint8_t b5 = (px >>  0) & 0x1F;
+			uint8_t g5 = (px >>  5) & 0x1F;
+			uint8_t r5 = (px >> 10) & 0x1F;
+			uint8_t a1 = (px >> 15) & 0x01;
+			/* Scale 5-bit to 8-bit by repeating the top bits. */
+			rgba[pi*4 + 0] = (r5 << 3) | (r5 >> 2);
+			rgba[pi*4 + 1] = (g5 << 3) | (g5 >> 2);
+			rgba[pi*4 + 2] = (b5 << 3) | (b5 >> 2);
+			rgba[pi*4 + 3] = a1 ? 255 : 0;
+		}
+		convertedPixels = rgba;
+		imageMemory  = rgba;
+		srcFormat    = GL_RGBA;
+		destFormat   = GL_RGBA;
+		dataType     = GL_UNSIGNED_BYTE;
+	}
+#endif
+
 			/* GET A UNIQUE TEXTURE NAME & INITIALIZE IT */
 
 	glGenTextures(1, &textureName);		
@@ -777,6 +814,10 @@ GLuint	textureName;
 	if (OGL_CheckError())
 		DoFatalAlert("OGL_TextureMap_Load: glTexImage2D failed!");
 
+#ifdef __EMSCRIPTEN__
+	if (convertedPixels)
+		SafeDisposePtr((Ptr) convertedPixels);
+#endif
 
 				/* SET THIS TEXTURE AS CURRENTLY ACTIVE FOR DRAWING */
 

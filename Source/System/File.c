@@ -14,6 +14,10 @@
 #include 	"bones.h"
 #include 	"lzss.h"
 
+#ifdef __EMSCRIPTEN__
+#include <sys/stat.h>	// mkdir
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -398,6 +402,17 @@ void InitPrefsFolder(bool createIt)
 {
 	OSErr iErr;
 	long createdDirID;
+
+#ifdef __EMSCRIPTEN__
+			/* IN EMSCRIPTEN, ENSURE THE XDG CONFIG PARENT DIRECTORY EXISTS */
+			// Pomme maps kPreferencesFolderType to ~/.config; mkdir any missing
+			// parent directories so that DirCreate can succeed below.
+	{
+		mkdir("/home", 0755);
+		mkdir("/home/web_user", 0755);
+		mkdir("/home/web_user/.config", 0755);
+	}
+#endif
 
 			/* CHECK PREFERENCES FOLDER */
 
