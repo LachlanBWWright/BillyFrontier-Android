@@ -177,7 +177,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.3
         with:
           path: all-artifacts
           pattern: 'BillyFrontier-*'
@@ -215,7 +215,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download wasm pages content
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.3
         with:
           name: github-pages-content
           path: docs-deploy
