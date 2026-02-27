@@ -42,14 +42,15 @@ jobs:
           # Use the Android-specific game CMakeLists.txt (builds as a shared lib)
           cp "${{ github.workspace }}/packaging/android-jni-src-CMakeLists.txt" \
              "$ANDROID_PROJ/app/jni/src/CMakeLists.txt"
-          # Build the APK using CMake (not ndk-build)
+          # Build the APK using CMake (not ndk-build); try release first, fall back to debug
           cd "$ANDROID_PROJ"
           mkdir -p "${{ github.workspace }}/dist"
-          ./gradlew assembleDebug --no-daemon -PBUILD_WITH_CMAKE
+          ./gradlew assembleRelease --no-daemon -PBUILD_WITH_CMAKE \
+            || ./gradlew assembleDebug --no-daemon -PBUILD_WITH_CMAKE
           find . -name "*.apk" -exec cp {} "${{ github.workspace }}/dist/${{ env.ARTIFACT_NAME }}" \;
         continue-on-error: true  # Android build is best-effort
       - uses: actions/upload-artifact@v4
-        if: success()
+        if: hashFiles('dist/**') != ''
         with:
           name: ${{env.ARTIFACT_NAME}}
           path: dist/

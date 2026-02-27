@@ -2,6 +2,9 @@ name: Full Compile Check
 
 on: [workflow_dispatch]
 
+permissions:
+  contents: read
+
 jobs:
   build-wasm:
     name: WebAssembly/Emscripten
