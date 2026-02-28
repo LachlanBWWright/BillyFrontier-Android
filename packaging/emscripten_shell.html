@@ -131,11 +131,17 @@
     }
     footer a { color: #888; text-decoration: none; }
     footer a:hover { color: #c0922a; }
+    header a.back-link {
+      color: #888;
+      text-decoration: none;
+      float: left;
+    }
+    header a.back-link:hover { color: #c0922a; }
   </style>
 </head>
 <body>
   <header>
-    <a href="../" style="color:#888;text-decoration:none;float:left">&#x2190; Back</a>
+    <a class="back-link" href="../">&#x2190; Back</a>
     Billy Frontier &mdash; WebAssembly
   </header>
 
@@ -310,13 +316,14 @@
     }
 
     // ── Mute toggle (Web Audio API) ───────────────────────
+    // SDL2 stores the AudioContext in SDL.audioContext; SDL3 may use a
+    // different location.  We check both known spots so the mute button
+    // works regardless of which SDL version the Emscripten build uses.
     var _audioMuted = false;
     function toggleMute() {
       var btn = document.getElementById('btn-mute');
       var ctx = (typeof SDL === 'object' && SDL.audioContext) || null;
-      // Try Emscripten's SDL audio context first, then the global AudioContext
       if (!ctx && typeof AudioContext !== 'undefined') {
-        // Emscripten may store the context differently depending on SDL version
         ctx = window._sdlAudioContext || null;
       }
       _audioMuted = !_audioMuted;

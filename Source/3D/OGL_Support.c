@@ -1360,7 +1360,12 @@ GLenum _OGL_CheckError(const char* file, const int line)
 	// LEGACY_GL_EMULATION generates spurious GL_INVALID_ENUM errors that
 	// accumulate in the error queue.  Drain the queue to prevent false
 	// positives from crashing the game via DoFatalAlert.
-	while (glGetError() != GL_NO_ERROR) { /* drain */ }
+	{
+		GLenum err;
+		while ((err = glGetError()) != GL_NO_ERROR) {
+			SDL_LogDebug(SDL_LOG_CATEGORY_RENDER, "GL error 0x%x drained in %s:%d", err, file, line);
+		}
+	}
 	return GL_NO_ERROR;
 #else
 	GLenum error = glGetError();

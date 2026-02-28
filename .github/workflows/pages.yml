@@ -53,6 +53,7 @@ jobs:
           echo "$EMSDK" >> "$GITHUB_PATH"
           echo "$EMSDK/upstream/emscripten" >> "$GITHUB_PATH"
           echo "$EMSDK/upstream/bin" >> "$GITHUB_PATH"
+          # Add Node.js binary dir (version varies, e.g. node/20.18.0_64bit/bin)
           for d in "$EMSDK/node/"*/bin; do [ -d "$d" ] && echo "$d" >> "$GITHUB_PATH"; done
 
       # Build WebAssembly with Emscripten
