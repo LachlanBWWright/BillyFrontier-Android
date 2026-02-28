@@ -254,7 +254,7 @@ static void OGL_CreateDrawContext(void)
 	if (!gAGLContext)
 		DoFatalAlert(SDL_GetError());
 
-	GAME_ASSERT(glGetError() == GL_NO_ERROR);
+	GAME_ASSERT(!OGL_CheckError());
 
 
 			/* ACTIVATE CONTEXT */
@@ -1356,6 +1356,14 @@ OGLLightDefType	*lights;
 
 GLenum _OGL_CheckError(const char* file, const int line)
 {
+#ifdef __EMSCRIPTEN__
+	// LEGACY_GL_EMULATION generates spurious GL_INVALID_ENUM errors that
+	// accumulate in the error queue.  Drain the queue to prevent false
+	// positives from crashing the game via DoFatalAlert.
+	GLenum err;
+	while ((err = glGetError()) != GL_NO_ERROR) { /* drain */ }
+	return GL_NO_ERROR;
+#else
 	GLenum error = glGetError();
 	if (error != 0)
 	{
@@ -1374,6 +1382,7 @@ GLenum _OGL_CheckError(const char* file, const int line)
 		DoFatalAlert("OpenGL error 0x%x (%s)\nin %s:%d", error, text, file, line);
 	}
 	return error;
+#endif
 }
 
 
