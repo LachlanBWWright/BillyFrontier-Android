@@ -78,6 +78,9 @@ static void Boot(int argc, char** argv)
 	SDL_SetAppMetadata(GAME_FULL_NAME, GAME_VERSION, GAME_IDENTIFIER);
 #if _DEBUG
 	SDL_SetLogPriorities(SDL_LOG_PRIORITY_VERBOSE);
+#elif defined(__EMSCRIPTEN__)
+	// Verbose logging for Emscripten helps debug WebGL/WASM issues in the browser console
+	SDL_SetLogPriorities(SDL_LOG_PRIORITY_VERBOSE);
 #else
 	SDL_SetLogPriorities(SDL_LOG_PRIORITY_INFO);
 #endif

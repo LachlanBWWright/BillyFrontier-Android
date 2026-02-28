@@ -11,6 +11,10 @@
 
 #include "game.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 /****************************/
 /*    PROTOTYPES            */
 /****************************/
@@ -427,6 +431,9 @@ unsigned long	someLong;
 		
 	while(true)
 	{		
+#ifdef __EMSCRIPTEN__
+		emscripten_sleep(0);	// yield to browser event loop between game restarts
+#endif
 		MyFlushEvents();
 
 		DoMainMenuScreen(0);

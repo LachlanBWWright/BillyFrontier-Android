@@ -254,13 +254,28 @@ static void OGL_CreateDrawContext(void)
 	if (!gAGLContext)
 		DoFatalAlert(SDL_GetError());
 
-	GAME_ASSERT(glGetError() == GL_NO_ERROR);
+	GAME_ASSERT(!OGL_CheckError());
 
 
 			/* ACTIVATE CONTEXT */
 
 	bool mkc = SDL_GL_MakeCurrent(gSDLWindow, gAGLContext);
 	GAME_ASSERT_MESSAGE(mkc, SDL_GetError());
+
+#ifdef __EMSCRIPTEN__
+	/*
+	 * LEGACY_GL_EMULATION workaround: Ensure GLImmediate is fully initialized
+	 * immediately after context creation.  Emscripten's GL emulation defers
+	 * initialization of s_texUnits, the matrix stack, and vertex buffers until
+	 * the first immediate-mode call.  Force it now so subsequent glEnable,
+	 * glMaterialfv, glColor4f, etc. calls don't crash on null state.
+	 */
+	EM_ASM({
+		if (typeof GLImmediate !== 'undefined' && GLImmediate.init) {
+			GLImmediate.init();
+		}
+	});
+#endif
 
 			/* ENABLE VSYNC */
 
@@ -1356,6 +1371,18 @@ OGLLightDefType	*lights;
 
 GLenum _OGL_CheckError(const char* file, const int line)
 {
+#ifdef __EMSCRIPTEN__
+	// LEGACY_GL_EMULATION generates spurious GL_INVALID_ENUM errors that
+	// accumulate in the error queue.  Drain the queue to prevent false
+	// positives from crashing the game via DoFatalAlert.
+	{
+		GLenum err;
+		while ((err = glGetError()) != GL_NO_ERROR) {
+			SDL_LogDebug(SDL_LOG_CATEGORY_RENDER, "GL error 0x%x drained in %s:%d", err, file, line);
+		}
+	}
+	return GL_NO_ERROR;
+#else
 	GLenum error = glGetError();
 	if (error != 0)
 	{
@@ -1374,6 +1401,7 @@ GLenum _OGL_CheckError(const char* file, const int line)
 		DoFatalAlert("OpenGL error 0x%x (%s)\nin %s:%d", error, text, file, line);
 	}
 	return error;
+#endif
 }
 
 

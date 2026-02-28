@@ -4,6 +4,8 @@ This is a port of Pangea Software’s “cowboys in space” game **Billy Fronti
 
 **Download the game for macOS, Windows and Linux here:** https://github.com/jorio/BillyFrontier/releases
 
+**▶ [Play in your browser](https://lachlanbwwright.github.io/BillyFrontier-Android/)** (WebAssembly)
+
 ![Billy Frontier Screenshot](screenshot.webp)
 
 ## About Billy Frontier

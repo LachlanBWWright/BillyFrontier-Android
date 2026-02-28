@@ -72,22 +72,15 @@ jobs:
       - name: Set artifact name
         run: echo "ARTIFACT_NAME=$(python3 build.py --print-artifact-name --emscripten)" >> $GITHUB_ENV
       - name: Build WebAssembly
-        run: python3 build.py --emscripten --dependencies --configure --build --package
+        run: python3 build.py --emscripten --dependencies --configure --build
+      - name: Patch LEGACY_GL_EMULATION JS issues
+        run: python3 packaging/patch_emscripten_js.py build/billyfrontier.js
+      - name: Package WebAssembly
+        run: python3 build.py --emscripten --package
       - uses: actions/upload-artifact@v4
         with:
           name: ${{env.ARTIFACT_NAME}}
           path: dist/
-          compression-level: 0
-      - name: Prepare GitHub Pages deployment
-        run: |
-          mkdir -p docs/game
-          unzip -o dist/${{ env.ARTIFACT_NAME }} -d /tmp/wasm-out
-          cp -r /tmp/wasm-out/*/* docs/game/ 2>/dev/null || cp -r /tmp/wasm-out/* docs/game/ 2>/dev/null || true
-      - name: Upload Pages artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: github-pages-content
-          path: docs/
           compression-level: 0
 
   release:
@@ -121,31 +114,4 @@ jobs:
           prerelease: false
           draft: false
 
-  deploy-pages:
-    needs: [build-wasm]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download wasm pages content
-        uses: actions/download-artifact@v4.1.3
-        with:
-          name: github-pages-content
-          path: docs-deploy
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs-deploy
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
 

@@ -114,6 +114,13 @@ endif()
 # DEPENDENCIES
 #------------------------------------------------------------------------------
 
+# Emscripten: set exception flags globally BEFORE add_subdirectory so all
+# translation units (including Pomme, SDL) use the same exception ABI.
+if(EMSCRIPTEN)
+	add_compile_options(-fexceptions)
+	add_link_options(-fexceptions -sDISABLE_EXCEPTION_CATCHING=0)
+endif()
+
 add_subdirectory(extern/Pomme)
 
 if(NOT EMSCRIPTEN)
@@ -366,6 +373,7 @@ if(EMSCRIPTEN)
 		# emscripten_sleep(0) is called after each frame (in OGL_DrawScene) to yield
 		# control back to the browser event loop.
 		-sASYNCIFY=1
+		-sASYNCIFY_STACK_SIZE=65536
 
 		# Legacy OpenGL emulation: translates the game's fixed-function OpenGL pipeline
 		# (glBegin/glEnd, glLight, glFog, glMatrix, etc.) into WebGL draw calls.
