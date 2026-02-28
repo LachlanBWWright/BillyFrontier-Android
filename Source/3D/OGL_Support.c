@@ -305,6 +305,24 @@ static void OGL_DisposeDrawContext(void)
 
 static void OGL_InitDrawContext(OGLViewDefType* viewDefPtr)
 {
+#ifdef __EMSCRIPTEN__
+	/*
+	 * LEGACY_GL_EMULATION workaround: Ensure GLImmediate is fully initialized
+	 * before any glEnable/glDisable calls.
+	 *
+	 * Emscripten's LEGACY_GL_EMULATION hooks glEnable/glDisable and calls
+	 * getCurTexUnit() which accesses the internal s_texUnits array.
+	 * This array is only populated by GLImmediate.init(), which may not
+	 * have been called yet if no immediate-mode GL function has been used.
+	 * Force initialization here to prevent a null-pointer crash.
+	 */
+	EM_ASM({
+		if (typeof GLImmediate !== 'undefined' && GLImmediate.init) {
+			GLImmediate.init();
+		}
+	});
+#endif
+
 			/* CLEAR ALL BUFFERS TO BLACK */
 			
 	glClearColor(0,0,0,1);

@@ -72,6 +72,9 @@ jobs:
       - name: Build WASM
         run: python3 build.py --emscripten --build
 
+      - name: Patch LEGACY_GL_EMULATION JS issues
+        run: python3 packaging/patch_emscripten_js.py build/billyfrontier.js
+
       # Assemble the GitHub Pages site in _site/
       - name: Assemble site
         if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
