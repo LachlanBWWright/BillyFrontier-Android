@@ -150,6 +150,7 @@
     <!-- Toolbar shown after load -->
     <div id="toolbar">
       <button class="toolbar-btn" onclick="toggleFullscreen()">&#x26F6; Fullscreen</button>
+      <button class="toolbar-btn" id="btn-mute" onclick="toggleMute()">&#x1F50A; Sound</button>
     </div>
   </div>
 
@@ -302,6 +303,23 @@
       } catch (e) {
         console.warn('[BillyFrontier] Fullscreen not supported:', e);
       }
+    }
+
+    // ── Mute toggle (Web Audio API) ───────────────────────
+    var _audioMuted = false;
+    function toggleMute() {
+      var btn = document.getElementById('btn-mute');
+      var ctx = (typeof SDL === 'object' && SDL.audioContext) || null;
+      // Try Emscripten's SDL audio context first, then the global AudioContext
+      if (!ctx && typeof AudioContext !== 'undefined') {
+        // Emscripten may store the context differently depending on SDL version
+        ctx = window._sdlAudioContext || null;
+      }
+      _audioMuted = !_audioMuted;
+      if (ctx && typeof ctx.suspend === 'function' && typeof ctx.resume === 'function') {
+        _audioMuted ? ctx.suspend() : ctx.resume();
+      }
+      btn.textContent = _audioMuted ? '\uD83D\uDD07 Muted' : '\uD83D\uDD0A Sound';
     }
 
     // -----------------------------------------------------------------------

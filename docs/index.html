@@ -173,8 +173,9 @@
 
     <div class="note">
       <strong>Note:</strong> The WebAssembly build requires a browser that supports
-      WebAssembly, WebGL, and SharedArrayBuffer (for audio). Chrome, Firefox, Edge,
-      and Safari all meet these requirements.
+      WebAssembly and WebGL. Chrome, Firefox, Edge,
+      and Safari all meet these requirements. Audio uses the Web Audio API
+      (ScriptProcessorNode fallback) and works without special headers.
     </div>
   </main>
 
