@@ -72,9 +72,11 @@ jobs:
       - name: Set artifact name
         run: echo "ARTIFACT_NAME=$(python3 build.py --print-artifact-name --emscripten)" >> $GITHUB_ENV
       - name: Build WebAssembly
-        run: python3 build.py --emscripten --dependencies --configure --build --package
+        run: python3 build.py --emscripten --dependencies --configure --build
       - name: Patch LEGACY_GL_EMULATION JS issues
         run: python3 packaging/patch_emscripten_js.py build/billyfrontier.js
+      - name: Package WebAssembly
+        run: python3 build.py --emscripten --package
       - uses: actions/upload-artifact@v4
         with:
           name: ${{env.ARTIFACT_NAME}}

@@ -20,7 +20,7 @@ import sys
 import re
 
 
-def patch(content: str) -> str:
+def patch(content: str) -> tuple:
     patches_applied = []
 
     # 1. Make getCurTexUnit null-safe
