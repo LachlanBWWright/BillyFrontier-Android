@@ -56,6 +56,12 @@ jobs:
           for d in "$EMSDK/node/"*/bin; do [ -d "$d" ] && echo "$d" >> "$GITHUB_PATH"; done
 
       # Build WebAssembly with Emscripten
+      - name: Cache SDL3 source (WASM build)
+        uses: actions/cache@v4
+        with:
+          path: extern/SDL3-3.2.8
+          key: sdl3-wasm-3.2.8-${{ runner.arch }}
+
       - name: Prepare dependencies
         run: python3 build.py --emscripten --dependencies
 
