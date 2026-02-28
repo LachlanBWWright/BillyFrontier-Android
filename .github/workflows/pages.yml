@@ -1,76 +1,110 @@
 name: Deploy to GitHub Pages
 
 on:
-  # Triggered by the release builds workflow when the wasm build completes
-  workflow_run:
-    workflows: ["Make Release Builds"]
-    types: [completed]
-
-  # Allow manual trigger
+  push:
+    branches: [main, master]
   workflow_dispatch:
 
+# Required for OIDC-based Pages deployment
 permissions:
   contents: read
-  pages: write
+  pages:    write
   id-token: write
 
+# Serialise deployments; allow parallel non-deploy runs on other branches
 concurrency:
-  group: "pages"
+  group: "pages-${{ github.ref }}"
   cancel-in-progress: false
 
 jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+        with: {submodules: 'recursive'}
+
+      # Configure the GitHub Pages environment (sets base URL etc.)
+      - name: Setup Pages
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+
+      # Cache the Emscripten SDK to avoid re-downloading on every run
+      - name: Cache Emscripten SDK
+        id: cache-emsdk
+        uses: actions/cache@v4
+        with:
+          path: .emsdk
+          key: emsdk-${{ runner.os }}-${{ runner.arch }}-v1
+          restore-keys: emsdk-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install Emscripten
+        run: |
+          if [ ! -f .emsdk/emsdk ]; then
+            git clone --depth=1 https://github.com/emscripten-core/emsdk.git .emsdk
+            .emsdk/emsdk install latest
+          fi
+          .emsdk/emsdk activate latest
+          source .emsdk/emsdk_env.sh
+          echo "EMSDK=$EMSDK" >> "$GITHUB_ENV"
+          echo "EM_CONFIG=$EM_CONFIG" >> "$GITHUB_ENV"
+          echo "EM_CACHE=$EM_CACHE" >> "$GITHUB_ENV"
+          echo "$EMSDK" >> "$GITHUB_PATH"
+          echo "$EMSDK/upstream/emscripten" >> "$GITHUB_PATH"
+          echo "$EMSDK/upstream/bin" >> "$GITHUB_PATH"
+          for d in "$EMSDK/node/"*/bin; do [ -d "$d" ] && echo "$d" >> "$GITHUB_PATH"; done
+
+      # Build WebAssembly with Emscripten
+      - name: Prepare dependencies
+        run: python3 build.py --emscripten --dependencies
+
+      - name: Configure WASM build
+        run: python3 build.py --emscripten --configure
+
+      - name: Build WASM
+        run: python3 build.py --emscripten --build
+
+      # Assemble the GitHub Pages site in _site/
+      - name: Assemble site
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p _site/game
+
+          # Copy static landing page and assets from docs/
+          cp -r docs/. _site/
+
+          # Copy WASM build output into game/ subdirectory
+          BUILD_DIR="${{ github.workspace }}/build"
+          cp "$BUILD_DIR/billyfrontier.html" "_site/game/billyfrontier.html"
+          cp "$BUILD_DIR/billyfrontier.js"   "_site/game/billyfrontier.js"
+          cp "$BUILD_DIR/billyfrontier.wasm" "_site/game/billyfrontier.wasm"
+          [ -f "$BUILD_DIR/billyfrontier.data" ] && cp "$BUILD_DIR/billyfrontier.data" "_site/game/billyfrontier.data" || true
+
+          # Prevent Jekyll from processing the static site
+          touch _site/.nojekyll
+
+          echo "Site contents:"
+          ls -lh _site/
+          echo "Game directory:"
+          ls -lh _site/game/
+
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site/
+
+  # Deploy to GitHub Pages — only runs on master/main
   deploy:
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    needs: build
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Download wasm pages content from release workflow
-        uses: actions/download-artifact@v4.1.3
-        with:
-          name: github-pages-content
-          run-id: ${{ github.event.workflow_run.id || github.run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: docs-deploy
-        continue-on-error: true
-
-      # Fallback: if the release workflow artifact isn't available (e.g. manual trigger),
-      # build the wasm bundle on the fly.
-      - name: Install Emscripten (fallback build)
-        if: ${{ hashFiles('docs-deploy/index.html') == '' }}
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: '3.1.69'
-          actions-cache-folder: 'emsdk-cache'
-
-      - name: Fallback WebAssembly build
-        if: ${{ hashFiles('docs-deploy/index.html') == '' }}
-        run: |
-          git submodule update --init --recursive
-          python3 build.py --emscripten --dependencies --configure --build --package
-          mkdir -p docs-deploy/game
-          ARTIFACT=$(python3 build.py --print-artifact-name --emscripten)
-          unzip -o "dist/$ARTIFACT" -d /tmp/wasm-out
-          cp -r /tmp/wasm-out/*/* docs-deploy/game/ 2>/dev/null || cp -r /tmp/wasm-out/* docs-deploy/game/ 2>/dev/null || true
-          cp -r docs/. docs-deploy/
-
-      - name: Copy static docs if game folder is missing
-        run: |
-          if [ ! -f docs-deploy/index.html ]; then
-            cp -r docs/. docs-deploy/
-          fi
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs-deploy
-
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
