@@ -75,6 +75,69 @@ def patch(content: str) -> str:
             content = content.replace(sq, "return", 1)
             patches_applied.append(f"TODO throw -> return (sq): {sq[:40]}...")
 
+    # 7. Guard matrix operations against undefined matrices.
+    #    GLImmediate.matrix[GLImmediate.currentMatrix] can be undefined if
+    #    GLImmediate hasn't been fully initialized when glFrustum/glOrtho/etc.
+    #    are called. Wrap mat4.multiply calls with a guard.
+    mat_multiply_pattern = "GLImmediate.matrixLib.mat4.multiply(GLImmediate.matrix[GLImmediate.currentMatrix],"
+    safe_prefix = "if(GLImmediate.matrix[GLImmediate.currentMatrix]){"
+    safe_suffix = "}"
+    # Find all occurrences and wrap them in a guard
+    idx = 0
+    mat_count = 0
+    while True:
+        pos = content.find(mat_multiply_pattern, idx)
+        if pos == -1:
+            break
+        # Find the closing parenthesis of the multiply call
+        # Count parens starting from the opening paren of multiply(
+        paren_start = pos + len("GLImmediate.matrixLib.mat4.multiply(") - 1
+        depth = 0
+        end_pos = paren_start
+        for i in range(paren_start, len(content)):
+            if content[i] == '(':
+                depth += 1
+            elif content[i] == ')':
+                depth -= 1
+                if depth == 0:
+                    end_pos = i + 1
+                    break
+        # Check for trailing semicolon
+        if end_pos < len(content) and content[end_pos] == ';':
+            end_pos += 1
+        original = content[pos:end_pos]
+        replacement = safe_prefix + original + safe_suffix
+        content = content[:pos] + replacement + content[end_pos:]
+        idx = pos + len(replacement)
+        mat_count += 1
+    if mat_count > 0:
+        patches_applied.append(f"mat4.multiply null guard (x{mat_count})")
+
+    # 8. Guard mat4.multiplyVec4 with GLImmediate.matrix[0] (light transform)
+    old_light = "GLImmediate.matrixLib.mat4.multiplyVec4(GLImmediate.matrix[0],"
+    new_light = "if(GLImmediate.matrix[0]){GLImmediate.matrixLib.mat4.multiplyVec4(GLImmediate.matrix[0],"
+    if old_light in content:
+        # Find the full call and wrap it
+        pos = content.find(old_light)
+        # Find closing paren
+        pstart = pos + len("GLImmediate.matrixLib.mat4.multiplyVec4(") - 1
+        depth = 0
+        epos = pstart
+        for i in range(pstart, len(content)):
+            if content[i] == '(':
+                depth += 1
+            elif content[i] == ')':
+                depth -= 1
+                if depth == 0:
+                    epos = i + 1
+                    break
+        if epos < len(content) and content[epos] == ';':
+            epos += 1
+        orig = content[pos:epos]
+        repl = "if(GLImmediate.matrix[0]){" + orig + "}"
+        content = content[:pos] + repl + content[epos:]
+        patches_applied.append("mat4.multiplyVec4 light transform null guard")
+
     return content, patches_applied
 
 
