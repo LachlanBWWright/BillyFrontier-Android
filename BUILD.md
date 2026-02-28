@@ -73,3 +73,32 @@ If you want to build the game **manually** instead, the rest of this document de
     ```
     If you'd like to enable runtime sanitizers, append `-DSANITIZE=1` to the **first** `cmake` call above.
 1. The game gets built in `build/BillyFrontier`. Enjoy!
+
+## How to build the game for WebAssembly (Emscripten)
+
+1. Install the prerequisites:
+    - [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html)
+    - CMake 3.21+
+    - Python 3
+1. Clone the repo **recursively**:
+    ```
+    git clone --recurse-submodules https://github.com/LachlanBWWright/BillyFrontier-Android
+    cd BillyFrontier-Android
+    ```
+1. Build using the automated script:
+    ```
+    python3 build.py --emscripten --dependencies --configure --build
+    ```
+1. Or build manually:
+    ```
+    emcmake cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build
+    ```
+1. The build outputs `build/billyfrontier.html`, `billyfrontier.js`, `billyfrontier.wasm`, and `billyfrontier.data`. Serve these with a local HTTP server:
+    ```
+    cd build
+    python3 -m http.server 8080
+    ```
+    Then open `http://localhost:8080/billyfrontier.html` in your browser.
+
+    **Note**: A plain `file://` URL won't work — the browser needs HTTP headers to load the `.wasm` and `.data` files.
