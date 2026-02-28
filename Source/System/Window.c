@@ -14,6 +14,10 @@
 #include	"window.h"
 #include "Pomme.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 
 /****************************/
 /*    PROTOTYPES            */
@@ -253,8 +257,12 @@ long	start;
 	start = TickCount();
 
 	while (TickCount()-start < ticks)
+	{
 		MyFlushEvents(); 
-
+#ifdef __EMSCRIPTEN__
+		emscripten_sleep(0);	// yield to browser during wait
+#endif
+	}
 }
 
 /********************** GET DEFAULT WINDOW SIZE **********************/
